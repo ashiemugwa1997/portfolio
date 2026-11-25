@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/mail"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -73,7 +74,6 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	mux.HandleFunc("GET /api/profile", s.profile)
 	mux.HandleFunc("POST /api/contact", s.contact)
-	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 404, map[string]string{"error": "not found"}) })
 	mux.HandleFunc("GET /", s.site)
 	return secure(mux)
 }
@@ -182,22 +182,26 @@ func (s *server) store(m message) error {
 
 // files from web/dist, anything else gets index.html
 func (s *server) site(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		writeJSON(w, 404, map[string]string{"error": "not found"})
+		return
+	}
 	root, err := filepath.Abs(s.static)
 	if err != nil {
 		http.Error(w, "site not built", 500)
 		return
 	}
-	clean := filepath.Clean("/" + r.URL.Path)
-	path := filepath.Join(root, filepath.FromSlash(clean))
-	if !strings.HasPrefix(path, root) {
+	clean := path.Clean("/" + r.URL.Path)
+	file := filepath.Join(root, filepath.FromSlash(clean))
+	if !strings.HasPrefix(file, root) {
 		http.NotFound(w, r)
 		return
 	}
-	if info, err := os.Stat(path); err == nil && !info.IsDir() {
+	if info, err := os.Stat(file); err == nil && !info.IsDir() {
 		if strings.HasPrefix(clean, "/assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
-		http.ServeFile(w, r, path)
+		http.ServeFile(w, r, file)
 		return
 	}
 	index := filepath.Join(root, "index.html")

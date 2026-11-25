@@ -149,7 +149,11 @@ func TestSiteServesFilesAndFallsBackToIndex(t *testing.T) {
 	if w := do(h, "GET", "/assets/app.js", "", nil); w.Code != 200 || !strings.Contains(w.Header().Get("Cache-Control"), "immutable") {
 		t.Fatalf("asset: %d %q", w.Code, w.Header().Get("Cache-Control"))
 	}
-	for _, p := range []string{"/", "/experience", "/../../etc/passwd"} {
+	// mux cleans ../ itself with a redirect to the clean path
+	if w := do(h, "GET", "/../../etc/passwd", "", nil); w.Code != 301 || w.Header().Get("Location") != "/etc/passwd" {
+		t.Errorf("traversal: %d %q", w.Code, w.Header().Get("Location"))
+	}
+	for _, p := range []string{"/", "/experience", "/etc/passwd", "/main.go"} {
 		w := do(h, "GET", p, "", nil)
 		if w.Code != 200 || !strings.Contains(w.Body.String(), "<title>home</title>") {
 			t.Errorf("%s: %d %q", p, w.Code, w.Body.String())
