@@ -1,0 +1,176 @@
+{
+  "name": "Ashley Mugwambi",
+  "role": "Lead Programmer",
+  "tagline": "Backend, systems and AI-augmented engineering",
+  "location": "Harare, Zimbabwe",
+  "summary": [
+    "I build and run enterprise software for critical institutions in Zimbabwe. Since February 2022 I have been Lead Programmer at ZESA Holdings (ZETDC), where I lead a team of eight developers and own the architecture and operation of the Business Excellence System, used by more than 8,000 people nationally.",
+    "My work covers the full life of a system: designing business workflows, building web, mobile and API solutions, testing them, releasing them, securing them, tuning their performance and supporting them in production."
+  ],
+  "links": [
+    { "label": "Email", "href": "mailto:ashleyzarter@gmail.com", "text": "ashleyzarter@gmail.com" },
+    { "label": "GitHub", "href": "https://github.com/ashiemugwa1997", "text": "github.com/ashiemugwa1997" },
+    { "label": "LinkedIn", "href": "https://www.linkedin.com/in/ashley-mugwambi-737b6b153", "text": "linkedin.com/in/ashley-mugwambi" }
+  ],
+  "metrics": [
+    { "value": "8,000+", "label": "people use the Business Excellence System nationally" },
+    { "value": "5,000+", "label": "commits on the codebase I lead, as top committer" },
+    { "value": "2,400+", "label": "automated unit and integration tests built and maintained" },
+    { "value": "22 → 8 min", "label": "release test time on the development server" },
+    { "value": "900 → 8", "label": "queries for one permission lookup" },
+    { "value": "195", "label": "pages reachable without sign-in, closed after a penetration test" }
+  ],
+  "pipeline": [
+    { "step": "Stage", "detail": "Copy the release beside the live one" },
+    { "step": "Check", "detail": "Config, data health and page checks" },
+    { "step": "Migrate", "detail": "Run migrations on the staged copy" },
+    { "step": "Test", "detail": "2,400+ tests, in parallel, on MySQL" },
+    { "step": "Swap", "detail": "Switch live in one move" },
+    { "step": "Roll back", "detail": "Automatically, if anything fails" }
+  ],
+  "experience": [
+    {
+      "id": "zetdc",
+      "title": "Lead Programmer",
+      "org": "ZESA Holdings (ZETDC)",
+      "period": "Feb 2022 – present",
+      "intro": "Lead a team of eight developers and own the architecture and operation of the Business Excellence System.",
+      "groups": [
+        {
+          "name": "Leadership and platform ownership",
+          "items": [
+            "Lead developer and top committer on a 5,000+ commit codebase shared by eight developers since 2023.",
+            "Own branching, code review and releases; my reviews caught a reintroduced open-redirect fault before it reached production.",
+            "Develop REST APIs and run CI/CD on Linux, including a versioned REST API for change requests."
+          ]
+        },
+        {
+          "name": "Budgeting and finance",
+          "items": [
+            "Designed and built the company budgeting module: budget packages, multi-level approval routed up the organisation tree, send-back and revision, and virements.",
+            "Built consolidation and Excel exports reproducing Finance's revenue and expenditure workbook, including head-office revenue apportioned across regions.",
+            "Rolled the module out to regional and head-office users, set up roles for several hundred requesters and approvers, and wrote the user and IT manuals."
+          ]
+        },
+        {
+          "name": "Procurement and operations apps",
+          "items": [
+            "Maintain purchase request, expenditure authorisation (ACE) and petty cash workflows, including approval routing and buyer scheduling.",
+            "Built the Zimbabwe National Load Shedding App.",
+            "Delivered the Drone Training Platform: 13 modules in React Native and Expo, replacing paper processes.",
+            "Built and signed the Android release of the GIS mobile app."
+          ]
+        },
+        {
+          "name": "Testing and quality",
+          "items": [
+            "Run the suite against SQLite and MySQL, exposing faults that SQLite-only runs had hidden.",
+            "Added React render tests (Vitest, Testing Library) and a jsdom harness that runs each page's own script and presses its buttons.",
+            "Wrote concurrency tests with real threads on MySQL to prove approvals stay correct when two people act at once."
+          ]
+        },
+        {
+          "name": "Release engineering and operations",
+          "items": [
+            "Rebuilt the deployment pipeline to stage, check, migrate and test each release before swapping it live, with automatic rollback. The deploy script has its own 65-check test.",
+            "Manage PostgreSQL and MySQL: zero-downtime migrations, backup and verified restore (including 158 GB of uploaded files), access control and audit logging.",
+            "Resolved production outages, including a full disk caused by database logging; added nightly log offload and disk guards."
+          ]
+        },
+        {
+          "name": "Security and performance",
+          "items": [
+            "Led remediation of an external EY penetration test, closing an anonymous API endpoint and 195 pages reachable without sign-in.",
+            "Rolled out SAML single sign-on on the platform and the outage management system.",
+            "Fixed a query that pinned the production database's cores, and cut one permission lookup from about 900 queries to 8."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "claxon",
+      "title": "Software Engineer (Contract)",
+      "org": "Claxon Actuaries",
+      "period": "Sep 2023 – ",
+      "intro": "Built the IFRS 17 Premium Allocation Approach (PAA) Model Automation Platform with Python, Django, pandas and scikit-learn.",
+      "groups": [
+        { "name": "", "items": ["The platform takes Excel input and predicts a policy's next cashflows from the previous five."] }
+      ]
+    },
+    {
+      "id": "one4pay",
+      "title": "Fintech Engineer",
+      "org": "One4Pay Gateway",
+      "period": "Jan – Jul 2022 · Abu Dhabi (remote)",
+      "intro": "Led seven engineers building multi-language payment SDKs on AWS.",
+      "groups": [
+        { "name": "", "items": ["Worked with Java 16, Spring Boot and JPA/Hibernate."] }
+      ]
+    },
+    {
+      "id": "moonlight",
+      "title": "IT Intern",
+      "org": "Moonlight Funeral Associates",
+      "period": "Sep 2019 – Jan 2021 · Harare",
+      "intro": "Worked across IT support, databases and networks, and contributed to requirements and internal system design.",
+      "groups": []
+    }
+  ],
+  "cases": [
+    {
+      "id": "releases",
+      "title": "Safer, faster releases",
+      "context": "Releases needed checking before going live, with a way back if something failed.",
+      "action": "Rebuilt the pipeline around a staged copy with checks, migrations, tests and automatic rollback; ran tests in parallel and fixed the flaky tests that exposed.",
+      "result": "Failed releases roll back on their own, and release test time fell from about 22 minutes to about 8."
+    },
+    {
+      "id": "testing",
+      "title": "Testing what users actually run",
+      "context": "SQLite-only runs hid faults, and UI faults had passed a fully green backend suite.",
+      "action": "Added MySQL test runs, React render tests and a jsdom harness that exercises page scripts and buttons.",
+      "result": "The MySQL runs exposed hidden faults, and testing now reaches browser-side behaviour."
+    },
+    {
+      "id": "access",
+      "title": "Closing access gaps",
+      "context": "An external EY penetration test required remediation.",
+      "action": "Led the remediation and enforced login across the platform.",
+      "result": "Closed an anonymous API endpoint and 195 pages reachable without sign-in."
+    },
+    {
+      "id": "data",
+      "title": "Finding a root cause in the data",
+      "context": "A blank column had been reported.",
+      "action": "Wrote a master-data health check that runs at every deployment.",
+      "result": "Its first run found the real cause: 20,718 materials had no unit of measure."
+    }
+  ],
+  "skills": [
+    { "area": "Backend", "items": ["Python", "Django", "Laravel", "Spring Boot", "Node.js", "Java"] },
+    { "area": "Web and mobile", "items": ["React", "TypeScript", "Angular", "Vue", "React Native", "Expo", "Flutter"] },
+    { "area": "Databases", "items": ["PostgreSQL", "MySQL", "SQL Server", "SQLite"] },
+    { "area": "Data and AI", "items": ["pandas", "scikit-learn", "Claude API", "OpenAI API", "LangChain"] },
+    { "area": "Cloud and DevOps", "items": ["AWS (EC2, S3, RDS)", "Docker", "CI/CD", "Linux"] },
+    { "area": "Integration and identity", "items": ["REST API design", "SDK design", "SAML SSO"] },
+    { "area": "Testing", "items": ["Unit", "Integration", "Regression", "Concurrency", "Vitest", "Testing Library", "jsdom"] }
+  ],
+  "projects": [
+    { "name": "Zvipfuwo Online Livestock Market", "detail": "PHP project nominated at University of Zimbabwe Research Week, 2019 and 2021." },
+    { "name": "Zimbabwe National Load Shedding App", "detail": "Public load-shedding schedules for the national grid." },
+    { "name": "Drone Training Platform", "detail": "13 modules in React Native and Expo, replacing paper processes." },
+    { "name": "IFRS 17 PAA Automation", "detail": "Actuarial model automation with Django, pandas and scikit-learn." },
+    { "name": "UZ 2021 Research Week App", "detail": "Event app for the University of Zimbabwe." },
+    { "name": "ZimPrices App", "detail": "Price tracking app." },
+    { "name": "Syberpol Insurance Management", "detail": "Insurance administration system." }
+  ],
+  "education": [
+    { "title": "Bachelor of Business Studies in Computer Science", "org": "University of Zimbabwe", "year": "2021" },
+    { "title": "A-Level (17 points) and O-Level (9 A's, 2 B's)", "org": "St Faith's High School", "year": "" }
+  ],
+  "credentials": [
+    "AWS Certified Cloud Practitioner",
+    "Member, Computer Society of Zimbabwe",
+    "English and Shona"
+  ]
+}
