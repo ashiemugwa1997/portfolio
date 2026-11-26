@@ -6,6 +6,7 @@ members = [
     "crates/tower-bulwark",
     "crates/contact-guard",
     "engine",
+    "server",
 ]
 
 [workspace.package]

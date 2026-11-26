@@ -1,0 +1,42 @@
+[package]
+name = "portfolio-server"
+version = "0.1.0"
+description = "The portfolio's web server: profile from MySQL, contact form, static site"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "portfolio"
+path = "src/main.rs"
+
+[features]
+default = ["native-tls"]
+# TLS for SMTP: the OS stack (Schannel on Windows), or rustls for portable Linux builds
+native-tls = ["lettre/tokio1-native-tls"]
+rustls = ["lettre/tokio1-rustls-tls"]
+
+[dependencies]
+contact-guard = { path = "../crates/contact-guard", features = ["serde"] }
+tower-bulwark = { path = "../crates/tower-bulwark" }
+windowgate = { path = "../crates/windowgate" }
+
+axum = { version = "0.7.9", default-features = false, features = ["json", "tokio", "http1"] }
+bytes = "1"
+hyper = { version = "1.5", features = ["server", "http1"] }
+hyper-util = { version = "0.1.10", features = ["tokio"] }
+lettre = { version = "0.11.10", default-features = false, features = ["builder", "smtp-transport", "tokio1"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "mysql", "time", "tls-native-tls"] }
+time = { version = "0.3", features = ["serde", "parsing", "formatting"] }
+tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "net", "time", "sync", "signal", "fs"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6.2", features = ["catch-panic", "timeout", "limit", "compression-gzip", "compression-br"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
