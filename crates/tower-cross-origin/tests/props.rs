@@ -1,10 +1,7 @@
 //! Random headers against an independent statement of the rules.
-use std::convert::Infallible;
-
-use http::{HeaderValue, Method, Request, Response, StatusCode};
+use http::{HeaderValue, Method, Request};
 use proptest::prelude::*;
-use tower::{service_fn, Layer, ServiceExt};
-use tower_cross_origin::{CrossOriginLayer, CrossOriginProtection};
+use tower_cross_origin::CrossOriginProtection;
 
 fn value() -> impl Strategy<Value = String> {
     prop_oneof!["[ -~]{0,30}", "https?://[a-z.]{1,12}(:[0-9]{1,5})?", Just("null".into())]
@@ -43,8 +40,14 @@ proptest! {
     }
 }
 
+#[cfg(feature = "tower")]
 #[tokio::test]
 async fn layer_answers_403_as_json() {
+    use http::{Response, StatusCode};
+    use std::convert::Infallible;
+    use tower::{service_fn, Layer, ServiceExt};
+    use tower_cross_origin::CrossOriginLayer;
+
     let svc = CrossOriginLayer::new(CrossOriginProtection::new())
         .layer(service_fn(|_r: Request<()>| async { Ok::<_, Infallible>(Response::new(String::from("ok"))) }));
     let evil = Request::post("/x").header("host", "a.example").header("sec-fetch-site", "cross-site").body(()).unwrap();

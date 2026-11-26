@@ -1,5 +1,3 @@
-use std::convert::Infallible;
-use std::net::SocketAddr;
 use std::time::Duration;
 
 use windowgate::{Backend, Limiter};
@@ -15,6 +13,8 @@ async fn memory_limiter_is_a_backend() {
 #[cfg(feature = "tower")]
 mod layer {
     use super::*;
+    use std::convert::Infallible;
+    use std::net::SocketAddr;
     use http::{Request, Response, StatusCode};
     use tower::{service_fn, Layer, ServiceExt};
     use windowgate::{BackendError, HitFuture, OnError, RateLimitLayer};

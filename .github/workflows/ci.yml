@@ -19,7 +19,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -29,6 +29,13 @@ jobs:
         run: cargo test --workspace
       - name: Crates with every feature
         run: cargo test -p windowgate -p contact-guard -p tower-cross-origin -p tower-bulwark -p fuzzrank --all-features
+      - name: Crates with no default features
+        shell: bash
+        run: |
+          for c in windowgate contact-guard tower-cross-origin tower-bulwark fuzzrank; do
+            cargo clippy -p "$c" --all-targets --no-default-features -- -D warnings
+            cargo clippy -p "$c" --all-targets --all-features -- -D warnings
+          done
 
   mysql:
     runs-on: ubuntu-latest
@@ -43,7 +50,7 @@ jobs:
     env:
       TEST_MYSQL_URL: mysql://root@127.0.0.1:3306
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - name: Server against MySQL
         run: cargo test -p portfolio-server
@@ -53,7 +60,7 @@ jobs:
   msrv:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.75
       # the workspace lockfile is newer than cargo 1.75 reads: check the dependency-free crates on their own
       - name: Dependency-free crates build and pass on the minimum supported Rust
@@ -79,8 +86,8 @@ jobs:
   web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - name: Site
@@ -93,7 +100,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

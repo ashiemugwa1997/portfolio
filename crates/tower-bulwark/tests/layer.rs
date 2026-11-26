@@ -102,6 +102,7 @@ async fn forwarded_for_is_ignored_unless_trusted() {
     assert_eq!(body(r), "203.0.113.7", "the entry the proxy appended, not the client's claim");
 }
 
+#[cfg(feature = "rate-limit")]
 #[tokio::test]
 async fn rate_limit_answers_429_with_retry_after() {
     let layer = Bulwark::builder().rate_limit(2, Duration::from_secs(60)).build();
