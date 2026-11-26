@@ -1,0 +1,17 @@
+# Caddy: automatic HTTPS (Let's Encrypt), HTTP -> HTTPS, HTTP/2 and HTTP/3.
+# Replace the domain, then: sudo cp Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+portfolio.example.com {
+	encode zstd gzip
+
+	# the server does the rest of the headers; HSTS is sent by it when HTTPS=1
+	header -Server
+
+	reverse_proxy 127.0.0.1:8080 {
+		# replace, not append: a client cannot plant its own first entry
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	request_body {
+		max_size 32KB
+	}
+}

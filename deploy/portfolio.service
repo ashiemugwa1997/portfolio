@@ -1,0 +1,41 @@
+# systemd unit: runs the server as its own unprivileged user, sandboxed, with secrets as
+# systemd credentials instead of environment variables.
+#   sudo useradd --system --home /opt/portfolio --shell /usr/sbin/nologin portfolio
+#   sudo install -d -o portfolio /opt/portfolio && copy the binary, server/content and web/dist there
+#   sudo systemd-creds encrypt --name=smtp_pass - /etc/credstore.encrypted/smtp_pass   (paste, Ctrl+D)
+#   sudo systemctl enable --now portfolio
+[Unit]
+Description=Portfolio web server
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+User=portfolio
+WorkingDirectory=/opt/portfolio/server
+ExecStart=/opt/portfolio/portfolio
+EnvironmentFile=/opt/portfolio/server/.env
+Environment=ADDR=127.0.0.1:8080 STATIC_DIR=/opt/portfolio/web/dist HTTPS=1 TRUST_PROXY=1
+LoadCredentialEncrypted=smtp_pass:/etc/credstore.encrypted/smtp_pass
+Environment=SMTP_PASS_FILE=%d/smtp_pass
+Restart=on-failure
+RestartSec=2
+
+# sandbox
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+ReadWritePaths=/opt/portfolio/server/data
+
+[Install]
+WantedBy=multi-user.target

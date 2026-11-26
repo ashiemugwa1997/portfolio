@@ -28,10 +28,11 @@ My portfolio site. The front end is React; everything behind it is Rust, split i
 | CSRF | Same-origin check on every write (`Origin` / `Sec-Fetch-Site`). |
 | Clickjacking, sniffing | `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, COOP/CORP. |
 | Email header injection | Control characters refused in names; headers folded to one line; RFC 2047 subjects. |
-| Spam and floods | Honeypot; 3 messages an hour per address and 50 a day for the site; 120 requests a minute per address; bounded limiter memory. |
+| Spam and floods | Honeypot; 3 messages an hour per sender and 50 a day for the site, counted in MySQL (survive restarts, shared by every server; senders kept only as salted hashes); 120 requests a minute per address; bounded limiter memory. |
 | Slow or idle clients | 5 s header deadline, 15 s request timeout, 16 KB body limit, 512 connections at most. |
 | Path traversal, dotfiles | Static files answered from an in-memory map; dotfiles never loaded and refused by a rule. |
-| Secrets | `.env` is git-ignored; database traffic uses TLS by default. |
+| Secrets | `.env` is git-ignored; any secret can come from a file; database traffic is always encrypted and a remote database must present a valid certificate. |
+| Unknown inputs | Property tests: tens of thousands of random and hostile inputs against every crate and the HTTP routes. |
 | Vulnerable dependencies | `cargo audit` (one documented, non-compiled exception in `.cargo/audit.toml`) and `npm audit`: 0 findings. |
 
 ## Performance (Windows laptop, Python client as the bottleneck)
@@ -56,7 +57,7 @@ cd server && ../target/release/portfolio seed  # load the content
 ../target/release/portfolio                    # http://127.0.0.1:8080
 ```
 
-Settings (in `server/.env` or the environment): `MYSQL_DSN`, `MYSQL_ADMIN_DSN`, `SMTP_USER`, `SMTP_PASS`, `MAIL_TO`, `ADDR`, `STATIC_DIR`, `TRUST_PROXY`, `HTTPS`, `RATE_LIMIT_PER_MIN`, `MAX_CONNECTIONS`.
+Settings (in `server/.env`, the environment, or a file named by `KEY_FILE`): `MYSQL_DSN`, `MYSQL_ADMIN_DSN`, `MYSQL_SSL_CA`, `IP_HASH_SALT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_TO`, `ADDR`, `STATIC_DIR`, `TRUST_PROXY`, `HTTPS`, `RATE_LIMIT_PER_MIN`, `MAX_CONNECTIONS`. `portfolio migrate` brings an existing database up to date. Hosting: see [DEPLOY.md](DEPLOY.md).
 
 ## Tests
 
