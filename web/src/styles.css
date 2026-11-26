@@ -207,6 +207,7 @@ h1 {
 .palette li { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 10px; cursor: pointer; font-size: 15px; }
 .palette li[aria-selected='true'] { background: var(--bg-2); box-shadow: inset 3px 0 0 var(--amber); }
 .palette .where { font-size: 11px; color: var(--amber); text-transform: uppercase; }
+.palette mark { background: none; color: var(--amber); font-weight: 700; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .palette .empty { color: var(--muted); cursor: default; }
 .palette .engine { display: flex; justify-content: space-between; margin: 0; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); }
 .palette .engine span { color: var(--mint); }

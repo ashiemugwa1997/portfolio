@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
-import { buildCorpus, jsSearcher, safeHref } from './search'
+import { buildCorpus, jsSearcher, runs, safeHref } from './search'
 import type { Profile } from './types'
 import profileJson from '../../server/content/profile.json'
 
@@ -33,6 +33,15 @@ describe('search corpus', () => {
   it('only safe links are clickable', () => {
     expect(['https://x.co', 'mailto:a@b.co', ' HTTP://x.co'].every(safeHref)).toBe(true)
     expect(['javascript:alert(1)', 'data:text/html,x', '//evil.co', ' JavaScript:x'].some(safeHref)).toBe(false)
+  })
+
+  it('highlight runs and fallback positions', () => {
+    expect(runs('Deploy', [0, 1, 2])).toEqual([{ text: 'Dep', hit: true }, { text: 'loy', hit: false }])
+    const s = jsSearcher(['Deployment pipeline', 'Café 😀 système'])
+    expect(s.positions(0, 'dply')).toEqual([0, 2, 3, 5])
+    expect(s.positions(0, 'pipe')).toEqual([11, 12, 13, 14])
+    expect(s.positions(1, 'système')).toEqual([7, 8, 9, 10, 11, 12, 13])
+    expect(s.positions(0, 'zzz')).toEqual([])
   })
 
   it('plain search needs every word', () => {
@@ -76,6 +85,7 @@ describe('App', () => {
     fireEvent.change(box, { target: { value: 'saml' } })
     const options = screen.getAllByRole('option')
     expect(options[0].textContent).toMatch(/SAML single sign-on/)
+    expect(options[0].querySelector('mark')?.textContent).toBe('SAML')
     fireEvent.keyDown(box, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })

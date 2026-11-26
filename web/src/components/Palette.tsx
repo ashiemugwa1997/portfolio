@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Hit } from '../types'
-import type { Searcher } from '../search'
+import { runs, type Searcher } from '../search'
 
 interface Props {
   hits: Hit[]
@@ -14,7 +14,10 @@ export default function Palette({ hits, searcher, onClose }: Props) {
   const [cursor, setCursor] = useState(0)
   const input = useRef<HTMLInputElement>(null)
 
-  const results = useMemo(() => searcher.search(query, 8).map((i) => hits[i]).filter(Boolean), [query, hits, searcher])
+  const results = useMemo(
+    () => searcher.search(query, 8).filter((i) => hits[i]).map((i) => ({ hit: hits[i], at: searcher.positions(i, query) })),
+    [query, hits, searcher],
+  )
 
   useEffect(() => input.current?.focus(), [])
   useEffect(() => setCursor(0), [query])
@@ -37,7 +40,7 @@ export default function Palette({ hits, searcher, onClose }: Props) {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setCursor((c) => Math.max(c - 1, 0))
-    } else if (e.key === 'Enter' && results[cursor]) go(results[cursor])
+    } else if (e.key === 'Enter' && results[cursor]) go(results[cursor].hit)
   }
 
   return (
@@ -60,7 +63,7 @@ export default function Palette({ hits, searcher, onClose }: Props) {
           aria-activedescendant={results[cursor] ? `hit-${cursor}` : undefined}
         />
         <ul id="palette-results" role="listbox">
-          {results.map((h, i) => (
+          {results.map(({ hit: h, at }, i) => (
             <li
               key={`${h.anchor}-${i}`}
               id={`hit-${i}`}
@@ -70,7 +73,11 @@ export default function Palette({ hits, searcher, onClose }: Props) {
               onClick={() => go(h)}
             >
               <span className="mono where">{h.section}</span>
-              <span>{h.text}</span>
+              <span>
+                {runs(h.text, at).map((r, k) =>
+                  r.hit ? <mark key={k}>{r.text}</mark> : <span key={k}>{r.text}</span>,
+                )}
+              </span>
             </li>
           ))}
           {query.trim() && results.length === 0 && <li className="empty">Nothing matches “{query}”.</li>}
