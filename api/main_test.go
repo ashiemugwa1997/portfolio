@@ -163,3 +163,56 @@ func TestSiteServesFilesAndFallsBackToIndex(t *testing.T) {
 		t.Errorf("unknown api: %d", w.Code)
 	}
 }
+
+type fakeMail struct{ got chan message }
+
+func (f *fakeMail) send(m message) error { f.got <- m; return nil }
+
+func TestValidMessageIsEmailed(t *testing.T) {
+	s, h, _ := setup(t)
+	f := &fakeMail{got: make(chan message, 1)}
+	s.mail = f
+	do(h, "POST", "/api/contact", `{"name":"Rudo","email":"rudo@example.com","message":"Hello"}`, jsonHdr)
+	select {
+	case m := <-f.got:
+		if m.Name != "Rudo" || m.Message != "Hello" {
+			t.Fatalf("emailed %+v", m)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no email sent")
+	}
+}
+
+func TestComposeKeepsHeadersSafe(t *testing.T) {
+	raw := string(compose("me@gmail.com", "me@gmail.com", message{
+		Name: "Eve\r\nBcc: victim@example.com", Email: "eve@example.com", Message: "line 1\nline 2",
+	}))
+	head, body, _ := strings.Cut(raw, "\r\n\r\n")
+	if strings.Contains(head, "\r\nBcc:") {
+		t.Fatalf("header injected:\n%s", head)
+	}
+	if !strings.Contains(head, "Reply-To: eve@example.com") || !strings.Contains(body, "line 1\r\nline 2") {
+		t.Fatalf("bad email:\n%s", raw)
+	}
+}
+
+func TestEnvFileLoadsButRealEnvWins(t *testing.T) {
+	file := filepath.Join(t.TempDir(), ".env")
+	os.WriteFile(file, []byte("# comment\nPF_A=from-file\nPF_B = \"quoted\"\nPF_C=from-file\n"), 0o600)
+	t.Setenv("PF_C", "from-env")
+	t.Setenv("PF_A", "")
+	os.Unsetenv("PF_A")
+	defer os.Unsetenv("PF_B")
+	loadEnv(file)
+	if os.Getenv("PF_A") != "from-file" || os.Getenv("PF_B") != "quoted" || os.Getenv("PF_C") != "from-env" {
+		t.Fatalf("got %q %q %q", os.Getenv("PF_A"), os.Getenv("PF_B"), os.Getenv("PF_C"))
+	}
+}
+
+func TestNoPasswordMeansNoMailer(t *testing.T) {
+	t.Setenv("SMTP_USER", "me@gmail.com")
+	t.Setenv("SMTP_PASS", "")
+	if mailerFromEnv() != nil {
+		t.Fatal("mailer without a password")
+	}
+}

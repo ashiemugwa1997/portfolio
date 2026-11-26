@@ -33,14 +33,23 @@ func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	static := flag.String("static", "../web/dist", "built React site to serve")
 	data := flag.String("data", "./data", "folder for contact messages")
+	env := flag.String("env", ".env", "settings file (email password etc.)")
 	flag.Parse()
+	loadEnv(*env)
 
 	if err := os.MkdirAll(*data, 0o700); err != nil {
 		log.Fatal(err)
 	}
+	s := newServer(*static, filepath.Join(*data, "messages.jsonl"), time.Now)
+	s.mail = mailerFromEnv()
+	if s.mail == nil {
+		log.Print("email off: set SMTP_USER and SMTP_PASS in .env to get messages by email")
+	} else {
+		log.Print("email on: messages are also emailed")
+	}
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           newServer(*static, filepath.Join(*data, "messages.jsonl"), time.Now).routes(),
+		Handler:           s.routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -55,6 +64,7 @@ type server struct {
 	now      func() time.Time
 	etag     string
 	limiter  *limiter
+	mail     mailer
 	writeMux sync.Mutex
 }
 
@@ -108,7 +118,7 @@ type message struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Message  string `json:"message"`
-	Website  string `json:"website"` // honeypot, hidden from people
+	Website  string `json:"website,omitempty"` // honeypot, hidden from people
 	Received string `json:"received,omitempty"`
 }
 
@@ -159,6 +169,7 @@ func (s *server) contact(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 500, map[string]string{"error": "Your message could not be saved. Please email me instead."})
 		return
 	}
+	s.notify(m)
 	writeJSON(w, 202, map[string]string{"status": "received"})
 }
 

@@ -5,3 +5,4 @@ engine/target/
 api/data/
 api/portfolio
 api/portfolio.exe
+api/.env

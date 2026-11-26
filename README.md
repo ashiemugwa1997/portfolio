@@ -31,7 +31,9 @@ Without `web/public/engine.wasm` the palette falls back to a plain search, so th
 
 ## Contact messages
 
-Stored, one JSON object per line, in `api/data/messages.jsonl` (owner-only permissions). Nothing is emailed.
+Stored, one JSON object per line, in `api/data/messages.jsonl` (owner-only permissions), and emailed to you when
+`api/.env` has a Gmail app password (`SMTP_USER`, `SMTP_PASS`, `MAIL_TO`; see `api/.env.example`). Restart the
+server after editing `.env`. Without a password, messages go to the file only.
 Limits: 3 messages an hour per address; a hidden field catches bots; length and email checks on the server.
 
 ## Tests
