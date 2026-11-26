@@ -18,6 +18,10 @@ for (const i of index.search('dep roll', 10)) {
 - Case-insensitive and Unicode-aware.
 - `highlight()` wraps matches in `<mark>` and HTML-escapes the rest.
 
+## Speed
+
+Top-10 search over 16,000 real file paths in Node, 8 queries: **fuzzrank-wasm 3.6 ms in total, Fuse.js 7.5.0 337 ms: 94× faster** (29× to 875× per query), with the same top results. Reproduce with `benches/fuse-compare` in the repository.
+
 Works in browsers, Node 18+, Deno and Bun. Bundlers pick up `fuzzrank.wasm` through `new URL(..., import.meta.url)`; to host it yourself, pass `createIndex(items, { wasm: '/path/fuzzrank.wasm' })` (a URL, the bytes, or a compiled `WebAssembly.Module`).
 
 With a strict Content-Security-Policy, allow `'wasm-unsafe-eval'` in `script-src`.

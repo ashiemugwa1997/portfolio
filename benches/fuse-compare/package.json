@@ -1,0 +1,7 @@
+{
+  "name": "fuse-compare",
+  "private": true,
+  "type": "module",
+  "scripts": { "bench": "node bench.mjs" },
+  "devDependencies": { "fuse.js": "7.5.0" }
+}
