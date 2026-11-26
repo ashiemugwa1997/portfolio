@@ -1,6 +1,6 @@
 [package]
 name = "fuzzrank"
-version = "0.2.1"
+version = "0.2.2"
 description = "Fast fuzzy search for command palettes and filters: every word must match, highlight positions, fuzzy-matcher compatible API. No dependencies, WebAssembly-friendly."
 readme = "README.md"
 keywords = ["fuzzy", "search", "ranking", "command-palette", "wasm"]

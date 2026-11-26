@@ -337,7 +337,8 @@ impl<S: Scorer> Matcher<S> {
         Matcher { scorer }
     }
 
-    /// The score of `pattern` against `choice`, or `None` when it does not match.
+    /// The score of `pattern` against `choice`, or `None` when it does not match. An empty or
+    /// blank pattern matches everything with score 0, as in `fuzzy-matcher`.
     ///
     /// Built for being called once per item with the same pattern: the parsed pattern is
     /// kept per thread, most non-matches are rejected before any work on `choice`, and the
@@ -346,7 +347,10 @@ impl<S: Scorer> Matcher<S> {
         PATTERN.with(|cell| {
             let mut c = cell.borrow_mut();
             c.load(pattern);
-            if c.terms.is_empty() || !CharMask::of_str(choice).contains(c.need) {
+            if c.terms.is_empty() {
+                return Some(0);
+            }
+            if !CharMask::of_str(choice).contains(c.need) {
                 return None;
             }
             let Prepared { terms, buf, .. } = &mut *c;
@@ -356,11 +360,12 @@ impl<S: Scorer> Matcher<S> {
         })
     }
 
-    /// The score and the matched character positions of `choice`, ascending.
+    /// The score and the matched character positions of `choice`, ascending. An empty or
+    /// blank pattern gives `Some((0, vec![]))`.
     pub fn fuzzy_indices(&self, choice: &str, pattern: &str) -> Option<(i64, Vec<usize>)> {
         let terms = terms_of(pattern);
         if terms.is_empty() {
-            return None;
+            return Some((0, Vec::new()));
         }
         let line = Line::new(choice);
         let score = line_score(&self.scorer, &terms, &line.chars)?;
@@ -638,7 +643,8 @@ mod tests {
                 assert_eq!(m.fuzzy_match(line, q), from_index, "{q:?} vs {line:?}");
             }
         }
-        assert_eq!(m.fuzzy_match("anything", "   "), None);
+        assert_eq!(m.fuzzy_match("anything", "   "), Some(0), "blank pattern matches all, like fuzzy-matcher");
+        assert_eq!(m.fuzzy_indices("anything", ""), Some((0, vec![])));
     }
 
     #[test]
@@ -654,7 +660,8 @@ mod tests {
         assert!(m.fuzzy_match("deployment", "dep").is_some());
         assert!(m.fuzzy_match("deployment", "xyz").is_none());
         assert!(m.fuzzy_match("deployment", "dep").is_some());
-        assert!(m.fuzzy_match("deployment", "").is_none());
+        assert_eq!(m.fuzzy_match("deployment", ""), Some(0));
+        assert!(m.fuzzy_match("deployment", "xyz").is_none(), "cache refreshed after the empty pattern");
     }
 
     #[test]

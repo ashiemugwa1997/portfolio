@@ -61,6 +61,7 @@ let hit: Option<(i64, Vec<usize>)> = matcher.fuzzy_indices("Deployment pipeline"
 Differences to know:
 
 - A pattern with spaces is several words that must all match, in any order (fuzzy-matcher treats a space as a character). Most palettes want this.
+- Like fuzzy-matcher, an empty pattern matches everything with score 0.
 - Scores are on a different scale; only compare scores from the same library.
 - If you search the same list repeatedly, build an `Index` once instead: it is about 10× faster than calling `Matcher` per item.
 
