@@ -137,3 +137,54 @@ mod mysql {
         });
     }
 }
+
+/// against a real Redis: TEST_REDIS_URL=redis://127.0.0.1/
+#[cfg(feature = "redis")]
+mod redis_backend {
+    use super::*;
+    use windowgate::RedisBackend;
+
+    async fn backend(name: &str, limit: usize, window: Duration) -> Option<RedisBackend> {
+        let url = std::env::var("TEST_REDIS_URL").ok()?;
+        let client = redis::Client::open(url).unwrap();
+        let mut c = client.get_multiplexed_async_connection().await.unwrap();
+        let keys: Vec<String> = redis::cmd("KEYS").arg(format!("windowgate:{name}:*")).query_async(&mut c).await.unwrap();
+        if !keys.is_empty() {
+            let _: () = redis::cmd("DEL").arg(keys).query_async(&mut c).await.unwrap();
+        }
+        Some(RedisBackend::connect(client, name, limit, window).await.unwrap())
+    }
+
+    #[tokio::test]
+    async fn sliding_window_in_redis() {
+        let Some(b) = backend("t-window", 2, Duration::from_millis(1500)).await else {
+            eprintln!("skipped: set TEST_REDIS_URL");
+            return;
+        };
+        assert!(b.hit("alice").await.unwrap().is_allowed());
+        assert!(b.hit("alice").await.unwrap().is_allowed());
+        match b.hit("alice").await.unwrap() {
+            windowgate::Decision::Limited { retry_after } => assert!(retry_after <= Duration::from_millis(1500)),
+            windowgate::Decision::Allowed => panic!("third hit allowed"),
+        }
+        assert!(b.hit("bob").await.unwrap().is_allowed(), "keys are independent");
+        tokio::time::sleep(Duration::from_millis(1600)).await;
+        assert!(b.hit("alice").await.unwrap().is_allowed(), "the window slid");
+    }
+
+    #[tokio::test]
+    async fn concurrent_hits_never_exceed_the_limit() {
+        let Some(b) = backend("t-burst", 5, Duration::from_secs(60)).await else { return };
+        let tasks: Vec<_> = (0..60)
+            .map(|_| {
+                let b = b.clone();
+                tokio::spawn(async move { b.hit("shared").await.unwrap().is_allowed() })
+            })
+            .collect();
+        let mut allowed = 0;
+        for t in tasks {
+            allowed += usize::from(t.await.unwrap());
+        }
+        assert_eq!(allowed, 5, "an atomic script lets exactly the limit through");
+    }
+}

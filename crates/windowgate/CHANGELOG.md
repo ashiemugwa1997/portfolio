@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- `RedisBackend` (feature `redis`): sliding-window limits in Redis, one atomic Lua script per hit (prune, count, add) on a sorted set, timed by the Redis server's clock; keys expire on their own. A burst of 60 concurrent hits lets exactly the limit through (tested against Redis in CI). The `redis` feature needs Rust 1.88, like the redis crate.
+
 ## 0.2.0
 
 - `Backend` trait: count hits anywhere. `Limiter<String>` implements it.

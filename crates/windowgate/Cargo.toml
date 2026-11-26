@@ -1,7 +1,7 @@
 [package]
 name = "windowgate"
-version = "0.2.0"
-description = "Sliding-window rate limiter per key with bounded memory; optional MySQL backend shared across servers and a tower layer. No dependencies by default."
+version = "0.2.1"
+description = "Sliding-window rate limiter per key with bounded memory; optional Redis and MySQL backends shared across servers, and a tower layer. No dependencies by default."
 readme = "README.md"
 keywords = ["rate-limit", "throttle", "sliding-window", "security", "dos"]
 categories = ["concurrency", "network-programming", "web-programming"]
@@ -13,10 +13,12 @@ repository.workspace = true
 
 [features]
 mysql = ["dep:sqlx"]
+redis = ["dep:redis"]
 tower = ["dep:http", "dep:tower-layer", "dep:tower-service"]
 
 [dependencies]
 http = { version = "1.1", optional = true }
+redis = { version = "1.8", default-features = false, features = ["tokio-comp", "connection-manager", "script"], optional = true }
 sqlx = { version = "0.9.0", default-features = false, features = ["mysql", "runtime-tokio"], optional = true }
 tower-layer = { version = "0.3", optional = true }
 tower-service = { version = "0.3", optional = true }

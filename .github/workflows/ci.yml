@@ -57,6 +57,19 @@ jobs:
       - name: windowgate MySQL backend
         run: TEST_MYSQL_URL=mysql://root@127.0.0.1:3306/portfolio cargo test -p windowgate --all-features
 
+  redis:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7.4
+        ports: ["6379:6379"]
+        options: --health-cmd="redis-cli ping" --health-interval=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: windowgate Redis backend
+        run: TEST_REDIS_URL=redis://127.0.0.1/ cargo test -p windowgate --all-features -- redis_backend
+
   msrv:
     runs-on: ubuntu-latest
     steps:

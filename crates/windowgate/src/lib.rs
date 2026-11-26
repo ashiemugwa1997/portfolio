@@ -7,7 +7,8 @@
 //!   grow the map without end. Pick the policy with [`Overflow`].
 //! * `Send + Sync`, no dependencies, no async runtime required.
 //! * Optional: the [`Backend`] trait for shared limits (feature `mysql` brings a MySQL
-//!   backend that every copy of a service shares) and a tower layer (feature `tower`).
+//!   backend, feature `redis` a Redis one; every copy of a service shares the counts) and a
+//!   tower layer (feature `tower`).
 //!
 //! ```
 //! use std::time::Duration;
@@ -28,12 +29,16 @@
 mod backend;
 #[cfg(feature = "mysql")]
 mod mysql;
+#[cfg(feature = "redis")]
+mod redis;
 #[cfg(feature = "tower")]
 mod tower;
 
 pub use backend::{Backend, BackendError, HitFuture};
 #[cfg(feature = "mysql")]
 pub use mysql::MySqlBackend;
+#[cfg(feature = "redis")]
+pub use redis::RedisBackend;
 #[cfg(feature = "tower")]
 pub use tower::{OnError, RateLimit, RateLimitLayer};
 

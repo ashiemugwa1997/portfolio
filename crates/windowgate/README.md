@@ -16,7 +16,7 @@ match per_ip.check("203.0.113.9") {
 }
 ```
 
-## Shared limits (feature `mysql`)
+## Shared limits (features `redis` and `mysql`)
 
 In-memory limiters (this one, `governor`) count per process: run three copies and a client gets three times the limit, and a restart forgets everything. `MySqlBackend` keeps the window in a table every copy shares, timed by the database's clock:
 
@@ -28,7 +28,15 @@ logins.create_table().await?;
 if !logins.hit(&email).await?.is_allowed() { /* 429 */ }
 ```
 
-Refused hits are removed again, so hammering never extends the wait, and a burst never gets more than the limit through (tested with 40 concurrent hits against MySQL 8.4). Anything else (Redis, Postgres) is one trait method: `Backend::hit`.
+Or with Redis, where each hit is one atomic Lua script on a sorted set:
+
+```rust,ignore
+use windowgate::RedisBackend;
+
+let api = RedisBackend::connect(redis::Client::open("redis://127.0.0.1/")?, "api", 120, Duration::from_secs(60)).await?;
+```
+
+Both use the server's clock, so instances with drifting clocks agree. Refused hits never extend the wait, and a burst never gets more than the limit through (tested with 40 concurrent hits against MySQL 8.4 and 60 against Redis). Anything else (Postgres, DynamoDB) is one trait method: `Backend::hit`.
 
 ## Tower / axum (feature `tower`)
 
