@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Better highlights and ranking for scattered matches: letters are aligned to the tightest stretch of text (forward pass to the first possible end, backward pass to the nearest letters), so "rlbk" marks "rollback" instead of the first r and l in the line. Scores use the same alignment, so what is highlighted is what was scored.
+
 ## 0.2.0
 
 - `Index::positions` and `Index::search_with_positions`: matched character positions for highlighting, mapped back to the original text when lowercasing changes its length.

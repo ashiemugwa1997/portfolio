@@ -1,6 +1,6 @@
 {
   "name": "fuzzrank-wasm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Fast fuzzy search for command palettes and filters, in 47 KB of Rust-built WebAssembly. Every word must match; highlight positions included.",
   "type": "module",
   "main": "./index.js",

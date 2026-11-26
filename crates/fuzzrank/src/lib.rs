@@ -48,7 +48,7 @@ pub trait Scorer {
     /// first place the letters occur in order; scorers with a different notion of a match
     /// should override it.
     fn positions(&self, term: &[char], line: &[char]) -> Option<Vec<usize>> {
-        in_order(term, line)
+        tight(term, line)
     }
 }
 
@@ -65,37 +65,34 @@ impl Scorer for Subsequence {
             let start_bonus = if word_start(hay, pos) { 30 } else { 10 };
             return Some(100 + start_bonus + term.len() as i32 * 4 - (pos.min(40) / 4) as i32);
         }
-        let mut total = 0;
-        let mut ti = 0;
-        let mut last: Option<usize> = None;
-        for (hi, &h) in hay.iter().enumerate() {
-            if ti == term.len() {
-                break;
-            }
-            if h != term[ti] {
-                continue;
-            }
-            total += 1;
-            if word_start(hay, hi) {
-                total += 8;
-            }
-            match last {
-                Some(l) if l + 1 == hi => total += 5,
-                Some(l) => total -= ((hi - l).min(10) / 3) as i32,
-                None => {}
-            }
-            last = Some(hi);
-            ti += 1;
-        }
-        (ti == term.len()).then_some(total)
+        tight(term, hay).map(|at| letters_score(&at, hay))
     }
 
     fn positions(&self, term: &[char], hay: &[char]) -> Option<Vec<usize>> {
         match find(hay, term) {
             Some(pos) => Some((pos..pos + term.len()).collect()),
-            None => in_order(term, hay),
+            None => tight(term, hay),
         }
     }
+}
+
+/// every matched letter earns a point; word starts and runs earn more, gaps cost a little
+fn letters_score(at: &[usize], hay: &[char]) -> i32 {
+    let mut total = 0;
+    let mut last: Option<usize> = None;
+    for &i in at {
+        total += 1;
+        if word_start(hay, i) {
+            total += 8;
+        }
+        match last {
+            Some(l) if l + 1 == i => total += 5,
+            Some(l) => total -= ((i - l).min(10) / 3) as i32,
+            None => {}
+        }
+        last = Some(i);
+    }
+    total
 }
 
 /// Plain case-insensitive substring matching, earlier positions first.
@@ -450,21 +447,32 @@ fn word_start(hay: &[char], i: usize) -> bool {
     i == 0 || !hay[i - 1].is_alphanumeric()
 }
 
-/// first occurrence of the letters of `term` in order
-fn in_order(term: &[char], hay: &[char]) -> Option<Vec<usize>> {
-    let mut at = Vec::with_capacity(term.len());
-    let mut next = term.iter().peekable();
-    for (i, h) in hay.iter().enumerate() {
-        match next.peek() {
-            Some(&&t) if t == *h => {
-                at.push(i);
-                next.next();
+/// The letters of `term` in order, in the tightest stretch of `hay` that ends where a full
+/// match first can: a forward pass finds that end, a backward pass from it takes the nearest
+/// letters. "rlbk" in "Rebuilt ... rollback" lands on "rollback", not on the first r and l.
+fn tight(term: &[char], hay: &[char]) -> Option<Vec<usize>> {
+    if term.is_empty() {
+        return Some(Vec::new());
+    }
+    let mut ti = 0;
+    let end = hay.iter().position(|&h| {
+        if h == term[ti] {
+            ti += 1;
+        }
+        ti == term.len()
+    })?;
+    let mut at = vec![0; term.len()];
+    let mut ti = term.len();
+    for i in (0..=end).rev() {
+        if hay[i] == term[ti - 1] {
+            ti -= 1;
+            at[ti] = i;
+            if ti == 0 {
+                break;
             }
-            Some(_) => {}
-            None => break,
         }
     }
-    next.peek().is_none().then_some(at)
+    Some(at)
 }
 
 fn find(hay: &[char], needle: &[char]) -> Option<usize> {
@@ -647,6 +655,29 @@ mod tests {
         assert!(m.fuzzy_match("deployment", "xyz").is_none());
         assert!(m.fuzzy_match("deployment", "dep").is_some());
         assert!(m.fuzzy_match("deployment", "").is_none());
+    }
+
+    #[test]
+    fn highlights_land_on_the_tight_match() {
+        let line = "Rebuilt the deployment pipeline before an automatic rollback";
+        let at = Index::new([line]).positions(0, "rlbk").unwrap();
+        let chars: Vec<char> = line.chars().collect();
+        let picked: String = at.iter().map(|&p| chars[p]).collect();
+        assert_eq!(picked, "rlbk");
+        assert!(at[0] > 40, "inside 'rollback', not the first r of 'Rebuilt': {at:?}");
+    }
+
+    #[test]
+    fn tight_window_is_never_wider_than_first_in_order() {
+        for (term, hay) in [("dply", "deployment"), ("ab", "a b ab"), ("aaa", "a a aaa"), ("xyz", "x y z")] {
+            let t: Vec<char> = term.chars().collect();
+            let h: Vec<char> = hay.chars().collect();
+            let a = tight(&t, &h).unwrap();
+            assert_eq!(a.len(), t.len());
+            assert!(a.windows(2).all(|w| w[0] < w[1]));
+            assert!(a.iter().zip(&t).all(|(&i, c)| h[i] == *c));
+        }
+        assert_eq!(tight(&['q'], &['a', 'b']), None);
     }
 
     #[test]

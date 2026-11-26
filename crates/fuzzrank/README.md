@@ -26,11 +26,12 @@ for (m, at) in index.search_with_positions("budget", 10) {
 - An exact substring beats scattered letters; letters that start a word or follow the previous match score higher.
 - Shorter lines win ties; equal scores keep the input order.
 - Case-insensitive and Unicode-aware; highlight positions point at the original characters even where lowercasing changes length (`İ`).
+- Scattered letters are aligned to the tightest stretch of text, so highlights land where a person would expect ("rlbk" marks "rollback").
 - Ranking is pluggable: implement `Scorer` (two built in: `Subsequence`, `Substring`).
 
 ## Speed
 
-Top-10 search over **15,986 real file paths** (every `.rs` file in a Cargo registry), 8 queries, release build, one core. All three libraries returned exactly the same matching lines for every query.
+Top-10 search over **about 16,000 real file paths** (every `.rs` file in a Cargo registry), 8 queries, release build, one core. All three libraries returned exactly the same matching lines for every query. Over several runs fuzzrank's `Index` was **11–14× faster than fuzzy-matcher** and **1.3–1.6× faster than nucleo-matcher**; one quiet run:
 
 | | total, 8 queries | vs fuzzy-matcher |
 |---|---:|---:|

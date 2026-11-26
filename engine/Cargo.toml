@@ -10,4 +10,4 @@ license.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-fuzzrank = { path = "../crates/fuzzrank", version = "0.2" }
+fuzzrank = { path = "../crates/fuzzrank", version = "0.2.1" }

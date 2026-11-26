@@ -4,7 +4,7 @@ My portfolio site. The front end is React; everything behind it is Rust, split i
 
 | Path | What |
 |---|---|
-| [`crates/fuzzrank`](crates/fuzzrank) | Fuzzy search: every word must match, highlight positions, `fuzzy-matcher`-compatible API. 14× faster than fuzzy-matcher and 1.6× faster than nucleo on 16k real paths. No dependencies. |
+| [`crates/fuzzrank`](crates/fuzzrank) | Fuzzy search: every word must match, highlight positions, `fuzzy-matcher`-compatible API. 11–14× faster than fuzzy-matcher and 1.3–1.6× faster than nucleo on 16k real paths. No dependencies. |
 | [`crates/windowgate`](crates/windowgate) | Sliding-window rate limiter with bounded memory; optional MySQL backend shared across servers and a tower layer. |
 | [`crates/tower-cross-origin`](crates/tower-cross-origin) | CSRF protection without tokens: Sec-Fetch-Site and Origin rules (as in Go's `CrossOriginProtection`), tower layer. |
 | [`crates/tower-bulwark`](crates/tower-bulwark) | Tower/axum layer: strict security headers, CSRF, trusted-proxy client IP, rate limiting, pluggable rules. |
