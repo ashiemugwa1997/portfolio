@@ -2,6 +2,7 @@
 //!
 //!   portfolio                 run the server (settings from .env)
 //!   portfolio seed [FILE]     load content into MySQL (default: content/profile.json)
+//!   portfolio migrate         add missing tables and columns, content untouched
 
 mod app;
 mod config;
@@ -12,6 +13,8 @@ mod store;
 
 #[cfg(test)]
 mod app_tests;
+#[cfg(test)]
+mod fuzz_tests;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -38,8 +41,9 @@ async fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         Some("seed") => seed(&cfg, args.get(1).map(String::as_str)).await,
+        Some("migrate") => migrate(&cfg).await,
         None | Some("serve") => serve(cfg).await,
-        Some(other) => Err(format!("unknown command {other:?}: use `portfolio` or `portfolio seed [FILE]`")),
+        Some(other) => Err(format!("unknown command {other:?}: use `portfolio`, `portfolio seed [FILE]` or `portfolio migrate`")),
     };
     if let Err(e) = result {
         tracing::error!("{e}");
@@ -60,6 +64,14 @@ async fn seed(cfg: &Config, file: Option<&str>) -> Result<(), String> {
     Ok(())
 }
 
+async fn migrate(cfg: &Config) -> Result<(), String> {
+    let url = cfg.admin_dsn.as_deref().ok_or("set MYSQL_ADMIN_DSN in .env")?;
+    let store = MySqlStore::connect(url, 2).await.map_err(|e| e.to_string())?;
+    store.migrate().await.map_err(|e| e.to_string())?;
+    tracing::info!("schema up to date");
+    Ok(())
+}
+
 async fn serve(cfg: Config) -> Result<(), String> {
     let url = cfg.dsn.as_deref().ok_or("set MYSQL_DSN in .env")?;
     let store = Arc::new(Cached::new(MySqlStore::connect(url, 10).await.map_err(|e| e.to_string())?, Duration::from_secs(30)));
@@ -76,7 +88,12 @@ async fn serve(cfg: Config) -> Result<(), String> {
     };
 
     let opts = Options { static_dir: cfg.static_dir.clone(), trust_proxy: cfg.trust_proxy, https: cfg.https, rate_limit: cfg.rate_limit };
-    let app = App::new(store, notifier).router(&opts);
+    let salt = match &cfg.ip_salt {
+        Some(s) if s.len() >= 32 => s.clone().into_bytes(),
+        Some(_) => return Err("IP_HASH_SALT must be at least 32 characters (openssl rand -hex 32)".into()),
+        None => return Err("set IP_HASH_SALT in .env (openssl rand -hex 32): it keeps sender hashes unlinkable".into()),
+    };
+    let app = App::new(store, notifier, salt).router(&opts);
     let listener = TcpListener::bind(&cfg.addr).await.map_err(|e| format!("{}: {e}", cfg.addr))?;
     tracing::info!("portfolio on http://{} (site {})", cfg.addr, cfg.static_dir.display());
 

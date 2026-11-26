@@ -14,6 +14,8 @@ pub struct Config {
     pub https: bool,
     pub max_connections: usize,
     pub rate_limit: usize,
+    /// secret mixed into sender hashes, so stored hashes cannot be matched to addresses
+    pub ip_salt: Option<String>,
     smtp_user: Option<String>,
     smtp_pass: Option<String>,
     smtp_host: String,
@@ -33,11 +35,12 @@ impl Config {
     /// settings from the environment, after filling gaps from a KEY=value file
     pub fn load(env_file: &str) -> Self {
         load_env_file(env_file);
-        let var = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+        let var = |k: &str| secret(k);
         let flag = |k: &str| var(k).is_some_and(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes"));
         Config {
             addr: var("ADDR").unwrap_or_else(|| "127.0.0.1:8080".into()),
             static_dir: var("STATIC_DIR").unwrap_or_else(|| "../web/dist".into()).into(),
+            ip_salt: var("IP_HASH_SALT"),
             dsn: var("MYSQL_DSN"),
             admin_dsn: var("MYSQL_ADMIN_DSN"),
             trust_proxy: flag("TRUST_PROXY"),
@@ -63,6 +66,22 @@ impl Config {
             pass,
         })
     }
+}
+
+/// A setting from `KEY`, or from the file named by `KEY_FILE` (Docker and systemd credentials),
+/// so secrets need not sit in the environment or in .env.
+fn secret(key: &str) -> Option<String> {
+    let direct = std::env::var(key).ok().filter(|v| !v.trim().is_empty());
+    direct.or_else(|| {
+        let path = std::env::var(format!("{key}_FILE")).ok().filter(|v| !v.trim().is_empty())?;
+        match std::fs::read_to_string(&path) {
+            Ok(v) => Some(v.trim().to_owned()).filter(|v| !v.is_empty()),
+            Err(e) => {
+                tracing::warn!("{key}_FILE {path}: {e}");
+                None
+            }
+        }
+    })
 }
 
 /// KEY=value lines; variables already in the environment win
@@ -94,7 +113,7 @@ pub async fn import_old_messages<S: Store>(store: &S, path: &str) {
     for line in text.lines() {
         let Ok(old) = serde_json::from_str::<OldMessage>(line) else { continue };
         let Verdict::Accept(m) = form.check(Submission::new(old.name, old.email, old.message)) else { continue };
-        if let Err(e) = store.save_message(&m, old.received.unwrap_or_else(time::OffsetDateTime::now_utc)).await {
+        if let Err(e) = store.save_message(&m, old.received.unwrap_or_else(time::OffsetDateTime::now_utc), None).await {
             tracing::warn!("import stopped: {e}");
             return;
         }
@@ -102,5 +121,25 @@ pub async fn import_old_messages<S: Store>(store: &S, path: &str) {
     }
     if tokio::fs::rename(path, format!("{path}.imported")).await.is_ok() {
         tracing::info!("import: {moved} old messages moved into MySQL");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::secret;
+
+    #[test]
+    fn secrets_can_come_from_files() {
+        let path = std::env::temp_dir().join(format!("pf-secret-{}", std::process::id()));
+        std::fs::write(&path, "  from-a-file \n").unwrap();
+        std::env::remove_var("PF_TEST_SECRET");
+        std::env::set_var("PF_TEST_SECRET_FILE", &path);
+        assert_eq!(secret("PF_TEST_SECRET").as_deref(), Some("from-a-file"));
+        std::env::set_var("PF_TEST_SECRET", "direct");
+        assert_eq!(secret("PF_TEST_SECRET").as_deref(), Some("direct"), "the variable itself wins");
+        std::env::remove_var("PF_TEST_SECRET");
+        std::env::set_var("PF_TEST_SECRET_FILE", "/no/such/file");
+        assert_eq!(secret("PF_TEST_SECRET"), None);
+        let _ = std::fs::remove_file(path);
     }
 }

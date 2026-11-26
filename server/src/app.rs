@@ -22,7 +22,7 @@ use windowgate::Limiter;
 
 use crate::mail::Notifier;
 use crate::static_site::StaticSite;
-use crate::store::Store;
+use crate::store::{ClientKey, Store};
 
 /// Wasm needs this on top of the strict default.
 const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; \
@@ -36,8 +36,12 @@ pub struct Options {
     pub rate_limit: usize,
 }
 
+const PER_SENDER_HOURLY: u64 = 3;
+const SITE_DAILY: u64 = 50;
+
 pub struct App<S> {
     store: S,
+    salt: Vec<u8>,
     form: Form,
     notifier: Notifier,
     per_ip: Limiter<IpAddr>,
@@ -45,13 +49,14 @@ pub struct App<S> {
 }
 
 impl<S: Store> App<S> {
-    pub fn new(store: S, notifier: Notifier) -> Self {
+    pub fn new(store: S, notifier: Notifier, salt: Vec<u8>) -> Self {
         App {
             store,
+            salt,
             form: Form::contact(),
             notifier,
-            per_ip: Limiter::new(3, Duration::from_secs(3600)),
-            site_daily: Limiter::new(50, Duration::from_secs(86_400)),
+            per_ip: Limiter::new(PER_SENDER_HOURLY as usize, Duration::from_secs(3600)),
+            site_daily: Limiter::new(SITE_DAILY as usize, Duration::from_secs(86_400)),
         }
     }
 
@@ -135,10 +140,26 @@ async fn contact<S: Store>(
         }
     };
     let ip = ip.map_or(IpAddr::from([0, 0, 0, 0]), |Extension(ClientIp(ip))| ip);
+    // in-memory limits first (cheap, per process), then the database's count, which
+    // survives restarts and is shared by every copy of the server
     if !app.per_ip.allow(&ip) || !app.site_daily.allow(&()) {
         return error(StatusCode::TOO_MANY_REQUESTS, "Thanks, I have your messages. Please try again later.");
     }
-    if let Err(e) = app.store.save_message(&msg, time::OffsetDateTime::now_utc()).await {
+    let key = ClientKey::of(&app.salt, ip);
+    let now = time::OffsetDateTime::now_utc();
+    let (mine, all) = tokio::join!(
+        app.store.messages_since(Some(key), now - time::Duration::hours(1)),
+        app.store.messages_since(None, now - time::Duration::days(1)),
+    );
+    match (mine, all) {
+        (Ok(m), Ok(a)) if m < PER_SENDER_HOURLY && a < SITE_DAILY => {}
+        (Ok(_), Ok(_)) => return error(StatusCode::TOO_MANY_REQUESTS, "Thanks, I have your messages. Please try again later."),
+        (Err(e), _) | (_, Err(e)) => {
+            tracing::error!("contact limit check: {e}");
+            return error(StatusCode::SERVICE_UNAVAILABLE, "Messages cannot be taken right now. Please email me instead.");
+        }
+    }
+    if let Err(e) = app.store.save_message(&msg, now, Some(key)).await {
         tracing::error!("contact store: {e}");
         return error(StatusCode::INTERNAL_SERVER_ERROR, "Your message could not be saved. Please email me instead.");
     }

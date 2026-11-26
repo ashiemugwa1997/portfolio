@@ -29,13 +29,15 @@ SQL
 
 # messages may not exist yet: create it as admin first so the INSERT grant has a table
 "$MYSQL" -h "$HOST" "$@" "$DB" <<SQL
-CREATE TABLE IF NOT EXISTS messages (id BIGINT AUTO_INCREMENT PRIMARY KEY, \`name\` VARCHAR(100) NOT NULL, email VARCHAR(200) NOT NULL, body TEXT NOT NULL, received DATETIME NOT NULL, KEY (received)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS messages (id BIGINT AUTO_INCREMENT PRIMARY KEY, \`name\` VARCHAR(100) NOT NULL, email VARCHAR(200) NOT NULL, body TEXT NOT NULL, received DATETIME NOT NULL, ip_hash BINARY(32) NULL, KEY (received), KEY sender (ip_hash, received)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 GRANT INSERT ON \`$DB\`.messages TO 'portfolio_app'@'localhost', 'portfolio_app'@'127.0.0.1';
 SQL
 
 touch .env
 chmod 600 .env 2>/dev/null || true
 grep -v -E '^(MYSQL_DSN|MYSQL_ADMIN_DSN)=' .env > .env.tmp || true
+# keep an existing salt: changing it makes stored sender hashes stop matching
+grep -q '^IP_HASH_SALT=' .env.tmp || echo "IP_HASH_SALT=$(openssl rand -hex 32)" >> .env.tmp
 {
   echo "MYSQL_DSN=mysql://portfolio_app:$APP_PW@$HOST:3306/$DB"
   echo "MYSQL_ADMIN_DSN=mysql://portfolio_admin:$ADMIN_PW@$HOST:3306/$DB"

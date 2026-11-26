@@ -16,7 +16,7 @@ use crate::store::MemoryStore;
 struct Site {
     router: Router,
     store: Arc<MemoryStore>,
-    _dir: TempDir,
+    dir: TempDir,
 }
 
 struct TempDir(PathBuf);
@@ -37,8 +37,8 @@ fn site() -> Site {
     std::fs::write(dir.join(".env"), "SECRET=1").unwrap();
     let store = Arc::new(MemoryStore::with(&Profile::from_json(DEFAULT_PROFILE).unwrap()));
     let opts = Options { static_dir: dir.clone(), trust_proxy: false, https: false, rate_limit: 120 };
-    let router = App::new(store.clone(), Notifier::off()).router(&opts);
-    Site { router, store, _dir: TempDir(dir) }
+    let router = App::new(store.clone(), Notifier::off(), b"test-salt".to_vec()).router(&opts);
+    Site { router, store, dir: TempDir(dir) }
 }
 
 fn req(method: &str, uri: &str, peer: &str) -> axum::http::request::Builder {
@@ -184,4 +184,20 @@ async fn store_down_gives_503_not_a_crash() {
     let (st, _, body) = send(&s, get("/api/profile")).await;
     assert_eq!(st, StatusCode::SERVICE_UNAVAILABLE);
     assert!(body.contains("unavailable"));
+}
+
+#[tokio::test]
+async fn limits_survive_a_restart() {
+    let s = site();
+    let ok = r#"{"name":"A","email":"a@b.co","message":"hi"}"#;
+    for _ in 0..3 {
+        assert_eq!(send(&s, contact(ok)).await.0, StatusCode::ACCEPTED);
+    }
+    // a fresh server on the same database: in-memory limits are empty, the database still counts
+    let opts = Options { static_dir: s.dir.0.clone(), trust_proxy: false, https: false, rate_limit: 120 };
+    let restarted = Site { router: App::new(s.store.clone(), Notifier::off(), b"test-salt".to_vec()).router(&opts), store: s.store.clone(), dir: TempDir(PathBuf::new()) };
+    assert_eq!(send(&restarted, contact(ok)).await.0, StatusCode::TOO_MANY_REQUESTS);
+    let saved = s.store.messages.lock().unwrap();
+    assert_eq!(saved.len(), 3);
+    assert!(saved.iter().all(|m| m.4.is_some()), "every message carries a sender hash");
 }

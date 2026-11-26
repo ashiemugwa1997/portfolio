@@ -40,3 +40,4 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["f
 
 [dev-dependencies]
 http-body-util = "0.1"
+proptest = { version = "1.5", default-features = false, features = ["std"] }

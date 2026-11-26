@@ -74,17 +74,38 @@ pub(crate) fn hex(b: &[u8]) -> String {
     s
 }
 
+/// Who sent a message, without keeping their address: SHA-256 of a secret salt and the IP.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ClientKey(pub [u8; 32]);
+
+impl ClientKey {
+    pub fn of(salt: &[u8], ip: std::net::IpAddr) -> Self {
+        let mut h = Sha256::new();
+        h.update(salt);
+        match ip {
+            std::net::IpAddr::V4(v4) => h.update(v4.octets()),
+            std::net::IpAddr::V6(v6) => h.update(v6.octets()),
+        }
+        ClientKey(h.finalize().into())
+    }
+}
+
 pub trait Store: Send + Sync + 'static {
     fn profile(&self) -> StoreFuture<'_, Arc<Rendered>>;
-    fn save_message(&self, m: &Message, received: OffsetDateTime) -> StoreFuture<'_, ()>;
+    fn save_message(&self, m: &Message, received: OffsetDateTime, from: Option<ClientKey>) -> StoreFuture<'_, ()>;
+    /// messages received since `since`, from one sender or (None) from everyone
+    fn messages_since(&self, from: Option<ClientKey>, since: OffsetDateTime) -> StoreFuture<'_, u64>;
 }
 
 impl<S: Store + ?Sized> Store for Arc<S> {
     fn profile(&self) -> StoreFuture<'_, Arc<Rendered>> {
         (**self).profile()
     }
-    fn save_message(&self, m: &Message, received: OffsetDateTime) -> StoreFuture<'_, ()> {
-        (**self).save_message(m, received)
+    fn save_message(&self, m: &Message, received: OffsetDateTime, from: Option<ClientKey>) -> StoreFuture<'_, ()> {
+        (**self).save_message(m, received, from)
+    }
+    fn messages_since(&self, from: Option<ClientKey>, since: OffsetDateTime) -> StoreFuture<'_, u64> {
+        (**self).messages_since(from, since)
     }
 }
 
@@ -135,19 +156,27 @@ impl<S: Store> Store for Cached<S> {
         })
     }
 
-    fn save_message(&self, m: &Message, received: OffsetDateTime) -> StoreFuture<'_, ()> {
-        self.inner.save_message(m, received)
+    fn save_message(&self, m: &Message, received: OffsetDateTime, from: Option<ClientKey>) -> StoreFuture<'_, ()> {
+        self.inner.save_message(m, received, from)
+    }
+
+    fn messages_since(&self, from: Option<ClientKey>, since: OffsetDateTime) -> StoreFuture<'_, u64> {
+        self.inner.messages_since(from, since)
     }
 }
 
 // ── Memory ──────────────────────────────────────────────────────────────────
+
+/// name, email, body, received, sender
+#[cfg(test)]
+pub type SavedMessage = (String, String, String, OffsetDateTime, Option<ClientKey>);
 
 /// In-process store for tests.
 #[cfg(test)]
 #[derive(Default)]
 pub struct MemoryStore {
     profile: Mutex<Option<Arc<Rendered>>>,
-    pub messages: Mutex<Vec<(String, String, String, OffsetDateTime)>>,
+    pub messages: Mutex<Vec<SavedMessage>>,
     pub loads: std::sync::atomic::AtomicUsize,
 }
 
@@ -176,9 +205,14 @@ impl Store for MemoryStore {
         Box::pin(async move { p.ok_or(StoreError::NoProfile) })
     }
 
-    fn save_message(&self, m: &Message, received: OffsetDateTime) -> StoreFuture<'_, ()> {
-        self.messages.lock().unwrap().push((m.name().into(), m.email().into(), m.body().into(), received));
+    fn save_message(&self, m: &Message, received: OffsetDateTime, from: Option<ClientKey>) -> StoreFuture<'_, ()> {
+        self.messages.lock().unwrap().push((m.name().into(), m.email().into(), m.body().into(), received, from));
         Box::pin(async { Ok(()) })
+    }
+
+    fn messages_since(&self, from: Option<ClientKey>, since: OffsetDateTime) -> StoreFuture<'_, u64> {
+        let n = self.messages.lock().unwrap().iter().filter(|m| m.3 >= since && (from.is_none() || m.4 == from)).count();
+        Box::pin(async move { Ok(n as u64) })
     }
 }
 
@@ -199,12 +233,30 @@ const SCHEMA: [&str; 13] = [
     "CREATE TABLE IF NOT EXISTS projects (pos INT PRIMARY KEY, `name` VARCHAR(100) NOT NULL, detail VARCHAR(300) NOT NULL)",
     "CREATE TABLE IF NOT EXISTS education (pos INT PRIMARY KEY, title VARCHAR(150) NOT NULL, org VARCHAR(150) NOT NULL, `year` VARCHAR(10) NOT NULL)",
     "CREATE TABLE IF NOT EXISTS credentials (pos INT PRIMARY KEY, body VARCHAR(200) NOT NULL)",
-    "CREATE TABLE IF NOT EXISTS messages (id BIGINT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(100) NOT NULL, email VARCHAR(200) NOT NULL, body TEXT NOT NULL, received DATETIME NOT NULL, KEY (received))",
+    "CREATE TABLE IF NOT EXISTS messages (id BIGINT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(100) NOT NULL, email VARCHAR(200) NOT NULL, body TEXT NOT NULL, received DATETIME NOT NULL, ip_hash BINARY(32) NULL, KEY (received), KEY sender (ip_hash, received))",
 ];
 
 /// children first, so deletes respect the foreign key
 const CONTENT_TABLES: [&str; 12] =
     ["job_items", "jobs", "summary", "links", "metrics", "pipeline", "cases", "skills", "projects", "education", "credentials", "profile"];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TlsPolicy {
+    /// same machine: encrypt; there is no network path to impersonate
+    Encrypt,
+    /// anywhere else: encrypt and check the certificate names this host
+    Verify,
+}
+
+fn tls_policy(host: &str) -> TlsPolicy {
+    let h = host.trim_matches(|c| c == '[' || c == ']');
+    let local = h.eq_ignore_ascii_case("localhost") || h.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback());
+    if local {
+        TlsPolicy::Encrypt
+    } else {
+        TlsPolicy::Verify
+    }
+}
 
 pub struct MySqlStore {
     pool: MySqlPool,
@@ -213,9 +265,19 @@ pub struct MySqlStore {
 impl MySqlStore {
     pub async fn connect(url: &str, max_conns: u32) -> Result<Self, StoreError> {
         let mut opts: MySqlConnectOptions = url.parse()?;
-        // encrypted unless the URL says otherwise (ssl-mode=...); also keeps the password exchange off RSA
+        // always encrypted (also keeps the password exchange off RSA); a remote server must also
+        // prove who it is. An explicit ssl-mode in the URL wins.
         if !url.to_ascii_lowercase().contains("ssl-mode=") {
-            opts = opts.ssl_mode(MySqlSslMode::Required);
+            opts = match tls_policy(opts.get_host()) {
+                TlsPolicy::Encrypt => opts.ssl_mode(MySqlSslMode::Required),
+                TlsPolicy::Verify => {
+                    let o = opts.ssl_mode(MySqlSslMode::VerifyIdentity);
+                    match std::env::var("MYSQL_SSL_CA").ok().filter(|v| !v.is_empty()) {
+                        Some(ca) => o.ssl_ca(ca),
+                        None => o,
+                    }
+                }
+            };
         }
         let opts = opts.charset("utf8mb4");
         let pool = MySqlPoolOptions::new()
@@ -323,11 +385,25 @@ impl MySqlStore {
         Ok(p.sanitised())
     }
 
-    /// create the tables and replace all content with `p`, in one transaction
-    pub async fn seed(&self, p: &Profile) -> Result<(), StoreError> {
+    /// create missing tables and columns; never touches content
+    pub async fn migrate(&self) -> Result<(), StoreError> {
         for q in SCHEMA {
             self.pool.execute(AssertSqlSafe(format!("{q}{TABLE_OPTS}"))).await?;
         }
+        let has_ip_hash: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'messages' AND column_name = 'ip_hash'",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        if has_ip_hash == 0 {
+            self.pool.execute("ALTER TABLE messages ADD COLUMN ip_hash BINARY(32) NULL, ADD KEY sender (ip_hash, received)").await?;
+        }
+        Ok(())
+    }
+
+    /// create the tables and replace all content with `p`, in one transaction
+    pub async fn seed(&self, p: &Profile) -> Result<(), StoreError> {
+        self.migrate().await?;
         let mut tx = self.pool.begin().await?;
         for t in CONTENT_TABLES {
             tx.execute(AssertSqlSafe(format!("DELETE FROM {t}"))).await?; // names are constants
@@ -438,17 +514,34 @@ impl Store for MySqlStore {
         Box::pin(async move { Ok(Arc::new(Rendered::of(&self.load().await?)?)) })
     }
 
-    fn save_message(&self, m: &Message, received: OffsetDateTime) -> StoreFuture<'_, ()> {
+    fn save_message(&self, m: &Message, received: OffsetDateTime, from: Option<ClientKey>) -> StoreFuture<'_, ()> {
         let (name, email, body) = (m.name().to_owned(), m.email().to_owned(), m.body().to_owned());
         Box::pin(async move {
-            sqlx::query("INSERT INTO messages (`name`, email, body, received) VALUES (?, ?, ?, ?)")
+            sqlx::query("INSERT INTO messages (`name`, email, body, received, ip_hash) VALUES (?, ?, ?, ?, ?)")
                 .bind(name)
                 .bind(email)
                 .bind(body)
                 .bind(utc_naive(received))
+                .bind(from.map(|k| k.0.to_vec()))
                 .execute(&self.pool)
                 .await?;
             Ok(())
+        })
+    }
+
+    fn messages_since(&self, from: Option<ClientKey>, since: OffsetDateTime) -> StoreFuture<'_, u64> {
+        Box::pin(async move {
+            let n: i64 = match from {
+                Some(k) => {
+                    sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE ip_hash = ? AND received >= ?")
+                        .bind(k.0.to_vec())
+                        .bind(utc_naive(since))
+                        .fetch_one(&self.pool)
+                        .await?
+                }
+                None => sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE received >= ?").bind(utc_naive(since)).fetch_one(&self.pool).await?,
+            };
+            Ok(u64::try_from(n).unwrap_or(0))
         })
     }
 }
@@ -508,11 +601,34 @@ mod tests {
             contact_guard::Verdict::Accept(m) => m,
             v => panic!("{v:?}"),
         };
-        store.save_message(&msg, OffsetDateTime::now_utc()).await.unwrap();
+        let hour_ago = OffsetDateTime::now_utc() - time::Duration::hours(1);
+        let me = ClientKey::of(b"salt", "192.0.2.1".parse().unwrap());
+        store.save_message(&msg, OffsetDateTime::now_utc(), Some(me)).await.unwrap();
+        assert_eq!(store.messages_since(None, hour_ago).await.unwrap(), 1);
+        assert_eq!(store.messages_since(Some(me), hour_ago).await.unwrap(), 1);
+        assert_eq!(store.messages_since(Some(ClientKey::of(b"salt", "192.0.2.2".parse().unwrap())), hour_ago).await.unwrap(), 0);
         let (name, body): (String, String) = sqlx::query_as("SELECT `name`, body FROM messages").fetch_one(&store.pool).await.unwrap();
         assert_eq!((name.as_str(), body.as_str()), ("Zoë 😀", "multi\nline"), "utf8mb4 end to end");
 
         admin.pool.execute(AssertSqlSafe(format!("DROP DATABASE `{db}`"))).await.unwrap();
+    }
+
+    #[test]
+    fn remote_databases_must_prove_who_they_are() {
+        for local in ["localhost", "127.0.0.1", "127.8.0.1", "::1", "[::1]", "LOCALHOST"] {
+            assert_eq!(tls_policy(local), TlsPolicy::Encrypt, "{local}");
+        }
+        for remote in ["db.example.com", "10.0.0.5", "172.16.28.32", "2001:db8::1", "localhost.evil.com"] {
+            assert_eq!(tls_policy(remote), TlsPolicy::Verify, "{remote}");
+        }
+    }
+
+    #[test]
+    fn client_keys_hide_the_address_and_depend_on_the_salt() {
+        let ip = "203.0.113.9".parse().unwrap();
+        assert_eq!(ClientKey::of(b"a", ip), ClientKey::of(b"a", ip));
+        assert_ne!(ClientKey::of(b"a", ip), ClientKey::of(b"b", ip));
+        assert_ne!(ClientKey::of(b"a", ip), ClientKey::of(b"a", "203.0.113.10".parse().unwrap()));
     }
 
     #[tokio::test]
