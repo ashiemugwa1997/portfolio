@@ -1,5 +1,8 @@
 import type { Hit, Profile } from './types'
 
+// only links people can safely click
+export const safeHref = (h: string) => /^(https?:\/\/|mailto:)/i.test(h.trim())
+
 // ── Corpus ──────────────────────────────────────────────────────────────────
 
 // flatten the profile into lines, each pointing at its section

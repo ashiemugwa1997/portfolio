@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Profile } from './types'
-import { buildCorpus, jsSearcher, wasmSearcher, type Searcher } from './search'
+import { buildCorpus, jsSearcher, safeHref, wasmSearcher, type Searcher } from './search'
 import Palette from './components/Palette'
 import Contact from './components/Contact'
 import Experience from './components/Experience'
@@ -113,9 +113,9 @@ export default function App() {
               </p>
             ))}
             <ul className="links">
-              {profile.links.map((l) => (
+              {profile.links.filter((l) => safeHref(l.href)).map((l) => (
                 <li key={l.label}>
-                  <a href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+                  <a href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">
                     <span className="mono">{l.label}</span> {l.text}
                   </a>
                 </li>

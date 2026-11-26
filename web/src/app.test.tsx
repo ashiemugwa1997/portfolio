@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
-import { buildCorpus, jsSearcher } from './search'
+import { buildCorpus, jsSearcher, safeHref } from './search'
 import type { Profile } from './types'
-import profileJson from '../../api/content/profile.json'
+import profileJson from '../../server/content/profile.json'
 
 const profile = profileJson as Profile
 
@@ -28,6 +28,11 @@ describe('search corpus', () => {
     for (const a of ['glance', 'pipeline', 'skills', 'projects', 'education']) expect(anchors).toContain(a)
     profile.experience.forEach((j) => expect(anchors).toContain(`job-${j.id}`))
     expect(hits.every((h) => !h.text.includes('\n'))).toBe(true)
+  })
+
+  it('only safe links are clickable', () => {
+    expect(['https://x.co', 'mailto:a@b.co', ' HTTP://x.co'].every(safeHref)).toBe(true)
+    expect(['javascript:alert(1)', 'data:text/html,x', '//evil.co', ' JavaScript:x'].some(safeHref)).toBe(false)
   })
 
   it('plain search needs every word', () => {
