@@ -1,15 +1,13 @@
 [package]
 name = "engine"
 version = "0.1.0"
-edition = "2021"
-description = "Fuzzy search over the portfolio, compiled to WebAssembly with no dependencies"
+description = "fuzzrank as a WebAssembly module for the portfolio's Ctrl+K search"
+publish = false
+edition.workspace = true
+license.workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[profile.release]
-opt-level = "s"
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
+[dependencies]
+fuzzrank = { path = "../crates/fuzzrank", version = "0.1" }

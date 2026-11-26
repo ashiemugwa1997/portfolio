@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/fuzzrank",
+    "engine",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+authors = ["Ashley Mugwambi"]
+repository = "https://github.com/ashiemugwa1997/portfolio"
+
+# engine.wasm is downloaded by every visitor: keep it small
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
