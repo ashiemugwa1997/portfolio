@@ -5,7 +5,7 @@ export interface Group { name: string; items: string[] }
 export interface Job { id: string; title: string; org: string; period: string; intro: string; groups: Group[] }
 export interface Case { id: string; title: string; context: string; action: string; result: string }
 export interface SkillArea { area: string; items: string[] }
-export interface Project { name: string; detail: string }
+export interface Project { name: string; detail: string; href?: string }
 export interface Education { title: string; org: string; year: string }
 
 export interface Profile {

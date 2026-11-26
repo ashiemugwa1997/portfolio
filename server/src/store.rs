@@ -230,7 +230,7 @@ const SCHEMA: [&str; 13] = [
     "CREATE TABLE IF NOT EXISTS job_items (job_slug VARCHAR(50) NOT NULL, grp_pos INT NOT NULL, grp VARCHAR(100) NOT NULL, pos INT NOT NULL, body TEXT NOT NULL, PRIMARY KEY (job_slug, grp_pos, pos), FOREIGN KEY (job_slug) REFERENCES jobs(slug) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS cases (pos INT PRIMARY KEY, slug VARCHAR(50) NOT NULL UNIQUE, title VARCHAR(150) NOT NULL, context TEXT NOT NULL, `action` TEXT NOT NULL, result TEXT NOT NULL)",
     "CREATE TABLE IF NOT EXISTS skills (area_pos INT NOT NULL, area VARCHAR(60) NOT NULL, pos INT NOT NULL, item VARCHAR(60) NOT NULL, PRIMARY KEY (area_pos, pos))",
-    "CREATE TABLE IF NOT EXISTS projects (pos INT PRIMARY KEY, `name` VARCHAR(100) NOT NULL, detail VARCHAR(300) NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS projects (pos INT PRIMARY KEY, `name` VARCHAR(100) NOT NULL, detail VARCHAR(300) NOT NULL, href VARCHAR(300) NULL)",
     "CREATE TABLE IF NOT EXISTS education (pos INT PRIMARY KEY, title VARCHAR(150) NOT NULL, org VARCHAR(150) NOT NULL, `year` VARCHAR(10) NOT NULL)",
     "CREATE TABLE IF NOT EXISTS credentials (pos INT PRIMARY KEY, body VARCHAR(200) NOT NULL)",
     "CREATE TABLE IF NOT EXISTS messages (id BIGINT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(100) NOT NULL, email VARCHAR(200) NOT NULL, body TEXT NOT NULL, received DATETIME NOT NULL, ip_hash BINARY(32) NULL, KEY (received), KEY sender (ip_hash, received))",
@@ -369,11 +369,11 @@ impl MySqlStore {
                 s.items.push(item);
             }
         }
-        p.projects = sqlx::query_as::<_, (String, String)>("SELECT `name`, detail FROM projects ORDER BY pos")
+        p.projects = sqlx::query_as::<_, (String, String, Option<String>)>("SELECT `name`, detail, href FROM projects ORDER BY pos")
             .fetch_all(db)
             .await?
             .into_iter()
-            .map(|(name, detail)| Project { name, detail })
+            .map(|(name, detail, href)| Project { name, detail, href })
             .collect();
         p.education = sqlx::query_as::<_, (String, String, String)>("SELECT title, org, `year` FROM education ORDER BY pos")
             .fetch_all(db)
@@ -390,13 +390,22 @@ impl MySqlStore {
         for q in SCHEMA {
             self.pool.execute(AssertSqlSafe(format!("{q}{TABLE_OPTS}"))).await?;
         }
-        let has_ip_hash: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'messages' AND column_name = 'ip_hash'",
-        )
-        .fetch_one(&self.pool)
-        .await?;
-        if has_ip_hash == 0 {
-            self.pool.execute("ALTER TABLE messages ADD COLUMN ip_hash BINARY(32) NULL, ADD KEY sender (ip_hash, received)").await?;
+        // columns added after the first release: (table, column, how to add it)
+        const ADDED: [(&str, &str, &str); 2] = [
+            ("messages", "ip_hash", "ALTER TABLE messages ADD COLUMN ip_hash BINARY(32) NULL, ADD KEY sender (ip_hash, received)"),
+            ("projects", "href", "ALTER TABLE projects ADD COLUMN href VARCHAR(300) NULL"),
+        ];
+        for (table, column, ddl) in ADDED {
+            let present: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
+            )
+            .bind(table)
+            .bind(column)
+            .fetch_one(&self.pool)
+            .await?;
+            if present == 0 {
+                self.pool.execute(ddl).await?;
+            }
         }
         Ok(())
     }
@@ -486,7 +495,13 @@ async fn insert_all(tx: &mut Transaction<'_, MySql>, p: &Profile) -> Result<(), 
         }
     }
     for (i, pr) in p.projects.iter().enumerate() {
-        sqlx::query("INSERT INTO projects (pos, `name`, detail) VALUES (?, ?, ?)").bind(i as i32).bind(&pr.name).bind(&pr.detail).execute(&mut **tx).await?;
+        sqlx::query("INSERT INTO projects (pos, `name`, detail, href) VALUES (?, ?, ?, ?)")
+            .bind(i as i32)
+            .bind(&pr.name)
+            .bind(&pr.detail)
+            .bind(pr.href.as_deref())
+            .execute(&mut **tx)
+            .await?;
     }
     for (i, e) in p.education.iter().enumerate() {
         sqlx::query("INSERT INTO education (pos, title, org, `year`) VALUES (?, ?, ?, ?)")

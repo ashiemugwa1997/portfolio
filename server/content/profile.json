@@ -5,28 +5,77 @@
   "location": "Harare, Zimbabwe",
   "summary": [
     "I build and run enterprise software for critical institutions in Zimbabwe. Since February 2022 I have been Lead Programmer at ZESA Holdings (ZETDC), where I lead a team of eight developers and own the architecture and operation of the Business Excellence System, used by more than 8,000 people nationally.",
-    "My work covers the full life of a system: designing business workflows, building web, mobile and API solutions, testing them, releasing them, securing them, tuning their performance and supporting them in production."
+    "My work covers the full life of a system: designing business workflows, building web, mobile and API solutions, testing them, releasing them, securing them, tuning their performance and supporting them in production.",
+    "Outside work I write open-source Rust: five crates on crates.io and an npm package, built to the same standard as production code, with property tests, benchmarks against the popular alternatives, CI on Linux, Windows and macOS, and a security policy."
   ],
   "links": [
-    { "label": "Email", "href": "mailto:ashleyzarter@gmail.com", "text": "ashleyzarter@gmail.com" },
-    { "label": "GitHub", "href": "https://github.com/ashiemugwa1997", "text": "github.com/ashiemugwa1997" },
-    { "label": "LinkedIn", "href": "https://www.linkedin.com/in/ashley-mugwambi-737b6b153", "text": "linkedin.com/in/ashley-mugwambi" }
+    {
+      "label": "Email",
+      "href": "mailto:ashleyzarter@gmail.com",
+      "text": "ashleyzarter@gmail.com"
+    },
+    {
+      "label": "GitHub",
+      "href": "https://github.com/ashiemugwa1997",
+      "text": "github.com/ashiemugwa1997"
+    },
+    {
+      "label": "LinkedIn",
+      "href": "https://www.linkedin.com/in/ashley-mugwambi-737b6b153",
+      "text": "linkedin.com/in/ashley-mugwambi"
+    }
   ],
   "metrics": [
-    { "value": "8,000+", "label": "people use the Business Excellence System nationally" },
-    { "value": "5,000+", "label": "commits on the codebase I lead, as top committer" },
-    { "value": "2,400+", "label": "automated unit and integration tests built and maintained" },
-    { "value": "22 → 8 min", "label": "release test time on the development server" },
-    { "value": "900 → 8", "label": "queries for one permission lookup" },
-    { "value": "195", "label": "pages reachable without sign-in, closed after a penetration test" }
+    {
+      "value": "8,000+",
+      "label": "people use the Business Excellence System nationally"
+    },
+    {
+      "value": "5,000+",
+      "label": "commits on the codebase I lead, as top committer"
+    },
+    {
+      "value": "2,400+",
+      "label": "automated unit and integration tests built and maintained"
+    },
+    {
+      "value": "22 → 8 min",
+      "label": "release test time on the development server"
+    },
+    {
+      "value": "900 → 8",
+      "label": "queries for one permission lookup"
+    },
+    {
+      "value": "195",
+      "label": "pages reachable without sign-in, closed after a penetration test"
+    }
   ],
   "pipeline": [
-    { "step": "Stage", "detail": "Copy the release beside the live one" },
-    { "step": "Check", "detail": "Config, data health and page checks" },
-    { "step": "Migrate", "detail": "Run migrations on the staged copy" },
-    { "step": "Test", "detail": "2,400+ tests, in parallel, on MySQL" },
-    { "step": "Swap", "detail": "Switch live in one move" },
-    { "step": "Roll back", "detail": "Automatically, if anything fails" }
+    {
+      "step": "Stage",
+      "detail": "Copy the release beside the live one"
+    },
+    {
+      "step": "Check",
+      "detail": "Config, data health and page checks"
+    },
+    {
+      "step": "Migrate",
+      "detail": "Run migrations on the staged copy"
+    },
+    {
+      "step": "Test",
+      "detail": "2,400+ tests, in parallel, on MySQL"
+    },
+    {
+      "step": "Swap",
+      "detail": "Switch live in one move"
+    },
+    {
+      "step": "Roll back",
+      "detail": "Automatically, if anything fails"
+    }
   ],
   "experience": [
     {
@@ -94,7 +143,12 @@
       "period": "Sep 2023 – ",
       "intro": "Built the IFRS 17 Premium Allocation Approach (PAA) Model Automation Platform with Python, Django, pandas and scikit-learn.",
       "groups": [
-        { "name": "", "items": ["The platform takes Excel input and predicts a policy's next cashflows from the previous five."] }
+        {
+          "name": "",
+          "items": [
+            "The platform takes Excel input and predicts a policy's next cashflows from the previous five."
+          ]
+        }
       ]
     },
     {
@@ -104,7 +158,12 @@
       "period": "Jan – Jul 2022 · Abu Dhabi (remote)",
       "intro": "Led seven engineers building multi-language payment SDKs on AWS.",
       "groups": [
-        { "name": "", "items": ["Worked with Java 16, Spring Boot and JPA/Hibernate."] }
+        {
+          "name": "",
+          "items": [
+            "Worked with Java 16, Spring Boot and JPA/Hibernate."
+          ]
+        }
       ]
     },
     {
@@ -117,6 +176,13 @@
     }
   ],
   "cases": [
+    {
+      "id": "fuzzrank",
+      "title": "Filling an abandoned gap in Rust",
+      "context": "fuzzy-matcher, used by 481 crates and downloaded 10 million times every 90 days, has not been updated since 2020.",
+      "action": "Built fuzzrank with a 64-bit character fingerprint per line, a bounded heap for top results and tight alignment for highlights; benchmarked it against fuzzy-matcher and nucleo on 16k real paths; ported the inquire prompt library to it and ran its full test suite.",
+      "result": "11–14× faster than fuzzy-matcher with the same matches; inquire's 292 tests pass on the published crate. A gap found during the port (empty patterns) was fixed and released the same day."
+    },
     {
       "id": "releases",
       "title": "Safer, faster releases",
@@ -147,26 +213,161 @@
     }
   ],
   "skills": [
-    { "area": "Backend", "items": ["Python", "Django", "Laravel", "Spring Boot", "Node.js", "Java"] },
-    { "area": "Web and mobile", "items": ["React", "TypeScript", "Angular", "Vue", "React Native", "Expo", "Flutter"] },
-    { "area": "Databases", "items": ["PostgreSQL", "MySQL", "SQL Server", "SQLite"] },
-    { "area": "Data and AI", "items": ["pandas", "scikit-learn", "Claude API", "OpenAI API", "LangChain"] },
-    { "area": "Cloud and DevOps", "items": ["AWS (EC2, S3, RDS)", "Docker", "CI/CD", "Linux"] },
-    { "area": "Integration and identity", "items": ["REST API design", "SDK design", "SAML SSO"] },
-    { "area": "Testing", "items": ["Unit", "Integration", "Regression", "Concurrency", "Vitest", "Testing Library", "jsdom"] }
+    {
+      "area": "Backend",
+      "items": [
+        "Rust",
+        "axum / tower",
+        "Python",
+        "Django",
+        "Laravel",
+        "Spring Boot",
+        "Node.js",
+        "Java"
+      ]
+    },
+    {
+      "area": "Web and mobile",
+      "items": [
+        "React",
+        "TypeScript",
+        "WebAssembly",
+        "Angular",
+        "Vue",
+        "React Native",
+        "Expo",
+        "Flutter"
+      ]
+    },
+    {
+      "area": "Databases",
+      "items": [
+        "PostgreSQL",
+        "MySQL",
+        "Redis",
+        "SQL Server",
+        "SQLite"
+      ]
+    },
+    {
+      "area": "Data and AI",
+      "items": [
+        "pandas",
+        "scikit-learn",
+        "Claude API",
+        "OpenAI API",
+        "LangChain"
+      ]
+    },
+    {
+      "area": "Cloud and DevOps",
+      "items": [
+        "AWS (EC2, S3, RDS)",
+        "Docker",
+        "CI/CD",
+        "Linux",
+        "GitHub Actions"
+      ]
+    },
+    {
+      "area": "Integration and identity",
+      "items": [
+        "REST API design",
+        "SDK design",
+        "SAML SSO"
+      ]
+    },
+    {
+      "area": "Testing",
+      "items": [
+        "Unit",
+        "Integration",
+        "Regression",
+        "Concurrency",
+        "Property-based testing",
+        "Load testing",
+        "Vitest",
+        "Testing Library",
+        "jsdom"
+      ]
+    }
   ],
   "projects": [
-    { "name": "Zvipfuwo Online Livestock Market", "detail": "PHP project nominated at University of Zimbabwe Research Week, 2019 and 2021." },
-    { "name": "Zimbabwe National Load Shedding App", "detail": "Public load-shedding schedules for the national grid." },
-    { "name": "Drone Training Platform", "detail": "13 modules in React Native and Expo, replacing paper processes." },
-    { "name": "IFRS 17 PAA Automation", "detail": "Actuarial model automation with Django, pandas and scikit-learn." },
-    { "name": "UZ 2021 Research Week App", "detail": "Event app for the University of Zimbabwe." },
-    { "name": "ZimPrices App", "detail": "Price tracking app." },
-    { "name": "Syberpol Insurance Management", "detail": "Insurance administration system." }
+    {
+      "name": "fuzzrank (Rust crate)",
+      "detail": "Fuzzy search for command palettes: 11–14× faster than fuzzy-matcher and 1.3–1.6× faster than nucleo-matcher on 16k real file paths, with highlight positions and a fuzzy-matcher compatible API. No dependencies.",
+      "href": "https://crates.io/crates/fuzzrank"
+    },
+    {
+      "name": "fuzzrank-wasm (npm)",
+      "detail": "The same engine as 47 KB of WebAssembly for JavaScript: 94× faster than Fuse.js on the same data, with types and a highlight helper.",
+      "href": "https://www.npmjs.com/package/fuzzrank-wasm"
+    },
+    {
+      "name": "windowgate (Rust crate)",
+      "detail": "Sliding-window rate limiter with bounded memory; Redis and MySQL backends so every server shares the limits; tower layer with Retry-After.",
+      "href": "https://crates.io/crates/windowgate"
+    },
+    {
+      "name": "tower-cross-origin (Rust crate)",
+      "detail": "CSRF protection without tokens or sessions for axum and tower, using the same Sec-Fetch-Site and Origin rules as Go's CrossOriginProtection.",
+      "href": "https://crates.io/crates/tower-cross-origin"
+    },
+    {
+      "name": "tower-bulwark (Rust crate)",
+      "detail": "One tower layer for security headers, CSRF, trusted-proxy client IP, rate limiting and custom rules; a maintained replacement for tower-helmet.",
+      "href": "https://crates.io/crates/tower-bulwark"
+    },
+    {
+      "name": "contact-guard (Rust crate)",
+      "detail": "Contact-form validation, honeypot and email composition that cannot be header-injected, with optional lettre output.",
+      "href": "https://crates.io/crates/contact-guard"
+    },
+    {
+      "name": "This portfolio",
+      "detail": "Rust server (axum, sqlx, MySQL) with the site held in memory, a React front end and the Ctrl+K search in WebAssembly; fuzz-tested, load-tested at 5,000+ requests a second.",
+      "href": "https://github.com/ashiemugwa1997/portfolio"
+    },
+    {
+      "name": "Zvipfuwo Online Livestock Market",
+      "detail": "PHP project nominated at University of Zimbabwe Research Week, 2019 and 2021."
+    },
+    {
+      "name": "Zimbabwe National Load Shedding App",
+      "detail": "Public load-shedding schedules for the national grid."
+    },
+    {
+      "name": "Drone Training Platform",
+      "detail": "13 modules in React Native and Expo, replacing paper processes."
+    },
+    {
+      "name": "IFRS 17 PAA Automation",
+      "detail": "Actuarial model automation with Django, pandas and scikit-learn."
+    },
+    {
+      "name": "UZ 2021 Research Week App",
+      "detail": "Event app for the University of Zimbabwe."
+    },
+    {
+      "name": "ZimPrices App",
+      "detail": "Price tracking app."
+    },
+    {
+      "name": "Syberpol Insurance Management",
+      "detail": "Insurance administration system."
+    }
   ],
   "education": [
-    { "title": "Bachelor of Business Studies in Computer Science", "org": "University of Zimbabwe", "year": "2021" },
-    { "title": "A-Level (17 points) and O-Level (9 A's, 2 B's)", "org": "St Faith's High School", "year": "" }
+    {
+      "title": "Bachelor of Business Studies in Computer Science",
+      "org": "University of Zimbabwe",
+      "year": "2021"
+    },
+    {
+      "title": "A-Level (17 points) and O-Level (9 A's, 2 B's)",
+      "org": "St Faith's High School",
+      "year": ""
+    }
   ],
   "credentials": [
     "AWS Certified Cloud Practitioner",

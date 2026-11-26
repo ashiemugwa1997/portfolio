@@ -195,7 +195,14 @@ export default function App() {
           <ul className="projects">
             {profile.projects.map((p) => (
               <li key={p.name}>
-                <strong>{p.name}</strong>
+                {p.href && safeHref(p.href) ? (
+                  <a className="project-link" href={p.href} target="_blank" rel="noopener noreferrer">
+                    <strong>{p.name}</strong>
+                    <span aria-hidden="true">↗</span>
+                  </a>
+                ) : (
+                  <strong>{p.name}</strong>
+                )}
                 <span>{p.detail}</span>
               </li>
             ))}

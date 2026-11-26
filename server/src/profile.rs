@@ -62,6 +62,8 @@ pub struct SkillArea {
 pub struct Project {
     pub name: String,
     pub detail: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub href: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -113,6 +115,9 @@ impl Profile {
         if let Some(l) = self.links.iter().find(|l| !safe_href(&l.href)) {
             return Err(format!("link {:?}: only https, http and mailto links are allowed", l.label));
         }
+        if let Some(p) = self.projects.iter().find(|p| p.href.as_deref().is_some_and(|h| !safe_href(h))) {
+            return Err(format!("project {:?}: only https, http and mailto links are allowed", p.name));
+        }
         let mut ids = std::collections::HashSet::new();
         if let Some(j) = self.experience.iter().find(|j| !ids.insert(j.id.as_str())) {
             return Err(format!("job id {:?} is used twice", j.id));
@@ -129,6 +134,12 @@ impl Profile {
             }
             ok
         });
+        for p in &mut self.projects {
+            if p.href.as_deref().is_some_and(|h| !safe_href(h)) {
+                tracing::warn!(project = %p.name, "project link dropped: only https, http and mailto are allowed");
+                p.href = None;
+            }
+        }
         self
     }
 }
@@ -148,7 +159,12 @@ mod tests {
         let mut p = Profile::from_json(DEFAULT_PROFILE).unwrap();
         p.links.push(Link { label: "x".into(), href: " JavaScript:alert(1)".into(), text: "x".into() });
         assert!(p.validate().is_err());
-        assert!(p.sanitised().links.iter().all(|l| safe_href(&l.href)));
+        assert!(p.clone().sanitised().links.iter().all(|l| safe_href(&l.href)));
+
+        let mut q = Profile::from_json(DEFAULT_PROFILE).unwrap();
+        q.projects[0].href = Some("javascript:alert(1)".into());
+        assert!(q.validate().is_err());
+        assert_eq!(q.sanitised().projects[0].href, None);
     }
 
     #[test]
