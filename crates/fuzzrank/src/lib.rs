@@ -19,6 +19,18 @@
 //! ```
 //!
 //! Ranking is pluggable: implement [`Scorer`] and build with [`Index::with_scorer`].
+//!
+//! For highlighting, [`Index::positions`] gives the matched characters of a result, and
+//! [`Matcher`] scores one string at a time with the same method names as `fuzzy-matcher`:
+//!
+//! ```
+//! use fuzzrank::Matcher;
+//!
+//! let m = Matcher::default();
+//! let (score, at) = m.fuzzy_indices("Deployment pipeline", "dply").unwrap();
+//! assert!(score > 0);
+//! assert_eq!(at, vec![0, 2, 3, 5]); // D-e-P-L-o-Y
+//! ```
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
@@ -31,6 +43,13 @@ use std::collections::BinaryHeap;
 pub trait Scorer {
     /// `None` when the word does not match the line at all. Higher is better.
     fn score(&self, term: &[char], line: &[char]) -> Option<i32>;
+
+    /// Which characters of `line` the word matched, ascending. The default finds the
+    /// first place the letters occur in order; scorers with a different notion of a match
+    /// should override it.
+    fn positions(&self, term: &[char], line: &[char]) -> Option<Vec<usize>> {
+        in_order(term, line)
+    }
 }
 
 /// The default: substring first, then letters in order with word-start and run bonuses.
@@ -70,6 +89,13 @@ impl Scorer for Subsequence {
         }
         (ti == term.len()).then_some(total)
     }
+
+    fn positions(&self, term: &[char], hay: &[char]) -> Option<Vec<usize>> {
+        match find(hay, term) {
+            Some(pos) => Some((pos..pos + term.len()).collect()),
+            None => in_order(term, hay),
+        }
+    }
 }
 
 /// Plain case-insensitive substring matching, earlier positions first.
@@ -79,6 +105,10 @@ pub struct Substring;
 impl Scorer for Substring {
     fn score(&self, term: &[char], hay: &[char]) -> Option<i32> {
         find(hay, term).map(|pos| 1000 - pos.min(1000) as i32)
+    }
+
+    fn positions(&self, term: &[char], hay: &[char]) -> Option<Vec<usize>> {
+        find(hay, term).map(|pos| (pos..pos + term.len()).collect())
     }
 }
 
@@ -109,6 +139,52 @@ impl PartialOrd for Match {
 struct Line {
     chars: Vec<char>,
     mask: CharMask,
+    /// lowercased index -> original character index, only when lowercasing changed the
+    /// length (e.g. 'İ' becomes two characters)
+    origin: Option<Box<[u32]>>,
+}
+
+impl Line {
+    fn new(text: &str) -> Self {
+        let mut chars = Vec::with_capacity(text.len());
+        let mut origin = Vec::new();
+        let mut grew = false;
+        for (i, c) in text.chars().enumerate() {
+            let before = chars.len();
+            chars.extend(c.to_lowercase());
+            grew |= chars.len() - before != 1;
+            origin.extend(std::iter::repeat(i as u32).take(chars.len() - before));
+        }
+        let mask = CharMask::of(&chars);
+        Line { chars, mask, origin: grew.then(|| origin.into_boxed_slice()) }
+    }
+
+    fn original(&self, lowered: usize) -> usize {
+        self.origin.as_ref().map_or(lowered, |o| o[lowered] as usize)
+    }
+}
+
+fn terms_of(query: &str) -> Vec<Vec<char>> {
+    query.split_whitespace().map(lower).collect()
+}
+
+/// every term must match; shorter lines win ties
+fn line_score<S: Scorer>(scorer: &S, terms: &[Vec<char>], line: &[char]) -> Option<i64> {
+    let mut total: i64 = 0;
+    for t in terms {
+        total += i64::from(scorer.score(t, line)?);
+    }
+    Some(total * 100 - (line.len().min(400) / 4) as i64)
+}
+
+fn line_positions<S: Scorer>(scorer: &S, terms: &[Vec<char>], line: &Line) -> Option<Vec<usize>> {
+    let mut at = Vec::new();
+    for t in terms {
+        at.extend(scorer.positions(t, &line.chars)?.into_iter().map(|i| line.original(i)));
+    }
+    at.sort_unstable();
+    at.dedup();
+    Some(at)
 }
 
 /// Lines to search, lowercased once, each with a character fingerprint for quick rejects.
@@ -158,11 +234,7 @@ impl<S: Scorer> Index<S> {
         I: IntoIterator<Item = T>,
         T: AsRef<str>,
     {
-        self.lines.extend(lines.into_iter().map(|l| {
-            let chars = lower(l.as_ref());
-            let mask = CharMask::of(&chars);
-            Line { chars, mask }
-        }));
+        self.lines.extend(lines.into_iter().map(|l| Line::new(l.as_ref())));
     }
 
     /// Number of lines.
@@ -176,7 +248,7 @@ impl<S: Scorer> Index<S> {
     }
 
     fn candidates<'a>(&'a self, query: &str) -> Option<impl Iterator<Item = Match> + 'a> {
-        let terms: Vec<Vec<char>> = query.split_whitespace().map(lower).collect();
+        let terms = terms_of(query);
         if terms.is_empty() {
             return None;
         }
@@ -185,12 +257,7 @@ impl<S: Scorer> Index<S> {
             if !line.mask.contains(need) {
                 return None;
             }
-            let mut total: i64 = 0;
-            for t in &terms {
-                total += i64::from(self.scorer.score(t, &line.chars)?);
-            }
-            let len_penalty = (line.chars.len().min(400) / 4) as i64;
-            Some(Match { index, score: total * 100 - len_penalty })
+            line_score(&self.scorer, &terms, &line.chars).map(|score| Match { index, score })
         }))
     }
 
@@ -227,6 +294,105 @@ impl<S: Scorer> Index<S> {
     pub fn rank(&self, query: &str) -> Vec<usize> {
         self.matches(query).into_iter().map(|m| m.index).collect()
     }
+
+    /// The characters of line `index` that `query` matched, as character positions in the
+    /// original text, ascending. `None` when the line does not match. Call it only for the
+    /// results you show: it is computed on demand.
+    pub fn positions(&self, index: usize, query: &str) -> Option<Vec<usize>> {
+        let terms = terms_of(query);
+        let line = self.lines.get(index)?;
+        if terms.is_empty() {
+            return None;
+        }
+        line_positions(&self.scorer, &terms, line)
+    }
+
+    /// [`Index::search`] plus the matched positions of each result, for highlighting.
+    pub fn search_with_positions(&self, query: &str, limit: usize) -> Vec<(Match, Vec<usize>)> {
+        let terms = terms_of(query);
+        self.search(query, limit)
+            .into_iter()
+            .filter_map(|m| Some((m, line_positions(&self.scorer, &terms, &self.lines[m.index])?)))
+            .collect()
+    }
+}
+
+// ── One string at a time ────────────────────────────────────────────────────
+
+/// Scores one string at a time, for callers that keep their own list. The methods have the
+/// same names and signatures as `fuzzy-matcher`'s `FuzzyMatcher`, so moving over is mostly a
+/// change of type. One difference: a pattern with spaces is several words, each of which
+/// must match, in any order.
+#[derive(Debug, Clone, Copy)]
+pub struct Matcher<S = Subsequence> {
+    scorer: S,
+}
+
+impl Default for Matcher<Subsequence> {
+    fn default() -> Self {
+        Matcher { scorer: Subsequence }
+    }
+}
+
+impl<S: Scorer> Matcher<S> {
+    /// A matcher that ranks with `scorer`.
+    pub fn with_scorer(scorer: S) -> Self {
+        Matcher { scorer }
+    }
+
+    /// The score of `pattern` against `choice`, or `None` when it does not match.
+    ///
+    /// Built for being called once per item with the same pattern: the parsed pattern is
+    /// kept per thread, most non-matches are rejected before any work on `choice`, and the
+    /// lowercased text goes into a reused buffer.
+    pub fn fuzzy_match(&self, choice: &str, pattern: &str) -> Option<i64> {
+        PATTERN.with(|cell| {
+            let mut c = cell.borrow_mut();
+            c.load(pattern);
+            if c.terms.is_empty() || !CharMask::of_str(choice).contains(c.need) {
+                return None;
+            }
+            let Prepared { terms, buf, .. } = &mut *c;
+            buf.clear();
+            buf.extend(choice.chars().flat_map(char::to_lowercase));
+            line_score(&self.scorer, terms, buf)
+        })
+    }
+
+    /// The score and the matched character positions of `choice`, ascending.
+    pub fn fuzzy_indices(&self, choice: &str, pattern: &str) -> Option<(i64, Vec<usize>)> {
+        let terms = terms_of(pattern);
+        if terms.is_empty() {
+            return None;
+        }
+        let line = Line::new(choice);
+        let score = line_score(&self.scorer, &terms, &line.chars)?;
+        Some((score, line_positions(&self.scorer, &terms, &line)?))
+    }
+}
+
+/// the last pattern seen on this thread, parsed, plus a scratch buffer
+#[derive(Default)]
+struct Prepared {
+    pattern: String,
+    terms: Vec<Vec<char>>,
+    need: CharMask,
+    buf: Vec<char>,
+}
+
+impl Prepared {
+    fn load(&mut self, pattern: &str) {
+        if self.pattern != pattern || (self.terms.is_empty() && !pattern.trim().is_empty()) {
+            self.pattern.clear();
+            self.pattern.push_str(pattern);
+            self.terms = terms_of(pattern);
+            self.need = self.terms.iter().fold(CharMask::default(), |m, t| m.union(CharMask::of(t)));
+        }
+    }
+}
+
+thread_local! {
+    static PATTERN: std::cell::RefCell<Prepared> = std::cell::RefCell::new(Prepared::default());
 }
 
 // ── Character fingerprint ───────────────────────────────────────────────────
@@ -251,6 +417,20 @@ impl CharMask {
         CharMask(chars.iter().fold(0, |m, &c| m | Self::bit(c)))
     }
 
+    /// the mask of `s` lowercased, without building the lowercased text
+    fn of_str(s: &str) -> Self {
+        let mut m = 0;
+        for b in s.bytes() {
+            if b.is_ascii() {
+                m |= Self::bit(char::from(b.to_ascii_lowercase()));
+            } else {
+                // rare: fall back to full Unicode lowercasing for the rest
+                return CharMask(m | s.chars().flat_map(char::to_lowercase).fold(0, |m, c| m | Self::bit(c)));
+            }
+        }
+        CharMask(m)
+    }
+
     fn union(self, other: Self) -> Self {
         CharMask(self.0 | other.0)
     }
@@ -268,6 +448,23 @@ fn lower(s: &str) -> Vec<char> {
 
 fn word_start(hay: &[char], i: usize) -> bool {
     i == 0 || !hay[i - 1].is_alphanumeric()
+}
+
+/// first occurrence of the letters of `term` in order
+fn in_order(term: &[char], hay: &[char]) -> Option<Vec<usize>> {
+    let mut at = Vec::with_capacity(term.len());
+    let mut next = term.iter().peekable();
+    for (i, h) in hay.iter().enumerate() {
+        match next.peek() {
+            Some(&&t) if t == *h => {
+                at.push(i);
+                next.next();
+            }
+            Some(_) => {}
+            None => break,
+        }
+    }
+    next.peek().is_none().then_some(at)
 }
 
 fn find(hay: &[char], needle: &[char]) -> Option<usize> {
@@ -393,6 +590,63 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn positions_for_highlighting() {
+        let i = idx();
+        assert_eq!(i.positions(2, "saml"), Some(vec![0, 1, 2, 3]));
+        assert_eq!(i.positions(0, "dply"), Some(vec![0, 2, 3, 5]));
+        assert_eq!(i.positions(0, "saml"), None);
+        assert_eq!(i.positions(99, "x"), None);
+        let both = i.positions(0, "dep roll").unwrap();
+        assert!(both.windows(2).all(|w| w[0] < w[1]), "ascending, no duplicates");
+    }
+
+    #[test]
+    fn positions_follow_the_original_text_when_lowercasing_grows_it() {
+        // 'İ' lowercases to two characters; positions must still point at the original
+        let i = Index::new(["İstanbul Bay"]);
+        let at = i.positions(0, "bay").unwrap();
+        let chars: Vec<char> = "İstanbul Bay".chars().collect();
+        assert_eq!(at.iter().map(|&p| chars[p]).collect::<String>(), "Bay");
+    }
+
+    #[test]
+    fn search_with_positions_pairs_each_result() {
+        let r = idx().search_with_positions("react", 3);
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].0.index, 4);
+        assert_eq!(r[0].1.len(), 5);
+    }
+
+    #[test]
+    fn matcher_agrees_with_index() {
+        let m = Matcher::default();
+        let i = idx();
+        for q in ["dep roll", "saml", "dev", "195", "lmas"] {
+            for (n, line) in LINES.iter().enumerate() {
+                let from_index = i.matches(q).into_iter().find(|x| x.index == n).map(|x| x.score);
+                assert_eq!(m.fuzzy_match(line, q), from_index, "{q:?} vs {line:?}");
+            }
+        }
+        assert_eq!(m.fuzzy_match("anything", "   "), None);
+    }
+
+    #[test]
+    fn string_mask_equals_char_mask() {
+        for s in ["", "Deployment Pipeline", "İstanbul", "Café système → déploiement", "A-Z 0-9 _./"] {
+            assert_eq!(CharMask::of_str(s), CharMask::of(&lower(s)), "{s:?}");
+        }
+    }
+
+    #[test]
+    fn matcher_pattern_cache_follows_the_pattern() {
+        let m = Matcher::default();
+        assert!(m.fuzzy_match("deployment", "dep").is_some());
+        assert!(m.fuzzy_match("deployment", "xyz").is_none());
+        assert!(m.fuzzy_match("deployment", "dep").is_some());
+        assert!(m.fuzzy_match("deployment", "").is_none());
     }
 
     #[test]

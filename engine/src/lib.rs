@@ -60,6 +60,21 @@ pub unsafe extern "C" fn search(q_ptr: *const u8, q_len: usize, out: *mut u32, m
     hits.len() as u32
 }
 
+/// Matched character positions of line `line` for the query, for highlighting.
+///
+/// # Safety
+/// `q_ptr..q_ptr+q_len` holds the query; `out` has room for `max` u32 values.
+#[no_mangle]
+pub unsafe extern "C" fn positions(line: u32, q_ptr: *const u8, q_len: usize, out: *mut u32, max: usize) -> u32 {
+    let query = String::from_utf8_lossy(std::slice::from_raw_parts(q_ptr, q_len));
+    let at = INDEX.with(|i| i.borrow().positions(line as usize, &query)).unwrap_or_default();
+    let n = at.len().min(max);
+    for (k, p) in at.iter().take(n).enumerate() {
+        *out.add(k) = *p as u32;
+    }
+    n as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

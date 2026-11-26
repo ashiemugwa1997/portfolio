@@ -1,5 +1,5 @@
 //! Random lines and queries against a plain reference model.
-use fuzzrank::Index;
+use fuzzrank::{Index, Matcher};
 use proptest::prelude::*;
 
 fn lower(s: &str) -> Vec<char> {
@@ -50,5 +50,22 @@ proptest! {
     fn results_are_ordered_best_first(lines in prop::collection::vec(text(), 0..40), query in text()) {
         let m = Index::new(&lines).matches(&query);
         prop_assert!(m.windows(2).all(|w| w[0].score > w[1].score || (w[0].score == w[1].score && w[0].index < w[1].index)));
+    }
+
+    /// a line has positions exactly when it matches, and they point at real, ascending characters
+    #[test]
+    fn positions_agree_with_matching(line in text(), query in text()) {
+        let index = Index::new([&line]);
+        let matched = !index.rank(&query).is_empty();
+        let at = index.positions(0, &query);
+        prop_assert_eq!(at.is_some(), matched);
+        if let Some(at) = at {
+            let n = line.chars().count();
+            prop_assert!(at.iter().all(|&p| p < n));
+            prop_assert!(at.windows(2).all(|w| w[0] < w[1]));
+            let (score, same) = Matcher::default().fuzzy_indices(&line, &query).unwrap();
+            prop_assert_eq!(Some(score), Matcher::default().fuzzy_match(&line, &query));
+            prop_assert_eq!(same, at);
+        }
     }
 }

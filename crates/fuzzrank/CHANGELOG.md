@@ -1,0 +1,13 @@
+# Changelog
+
+## 0.2.0
+
+- `Index::positions` and `Index::search_with_positions`: matched character positions for highlighting, mapped back to the original text when lowercasing changes its length.
+- `Matcher`: score one string at a time with `fuzzy_match` / `fuzzy_indices`, the same names and signatures as `fuzzy-matcher`. Caches the parsed pattern per thread and rejects most non-matches before lowercasing.
+- `Scorer::positions` (default method, so existing scorers keep compiling).
+- Benchmarks against fuzzy-matcher and nucleo-matcher; migration guide from fuzzy-matcher.
+- Property tests against a reference model.
+
+## 0.1.0
+
+- First release: `Index` with character-fingerprint quick reject, heap top-k, pluggable `Scorer`.
