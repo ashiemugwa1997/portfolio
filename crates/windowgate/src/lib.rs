@@ -6,6 +6,8 @@
 //!   are refused until old ones expire, so a flood from rotating addresses cannot
 //!   grow the map without end. Pick the policy with [`Overflow`].
 //! * `Send + Sync`, no dependencies, no async runtime required.
+//! * Optional: the [`Backend`] trait for shared limits (feature `mysql` brings a MySQL
+//!   backend that every copy of a service shares) and a tower layer (feature `tower`).
 //!
 //! ```
 //! use std::time::Duration;
@@ -22,6 +24,18 @@
 //! ```
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+
+mod backend;
+#[cfg(feature = "mysql")]
+mod mysql;
+#[cfg(feature = "tower")]
+mod tower;
+
+pub use backend::{Backend, BackendError, HitFuture};
+#[cfg(feature = "mysql")]
+pub use mysql::MySqlBackend;
+#[cfg(feature = "tower")]
+pub use tower::{OnError, RateLimit, RateLimitLayer};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;

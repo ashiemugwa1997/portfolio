@@ -1,7 +1,7 @@
 [package]
 name = "windowgate"
-version = "0.1.0"
-description = "Sliding-window rate limiter per key, with a hard cap on tracked keys so address-rotating floods cannot exhaust memory. Thread-safe, no dependencies."
+version = "0.2.0"
+description = "Sliding-window rate limiter per key with bounded memory; optional MySQL backend shared across servers and a tower layer. No dependencies by default."
 readme = "README.md"
 keywords = ["rate-limit", "throttle", "sliding-window", "security", "dos"]
 categories = ["concurrency", "network-programming", "web-programming"]
@@ -11,7 +11,21 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[features]
+mysql = ["dep:sqlx"]
+tower = ["dep:http", "dep:tower-layer", "dep:tower-service"]
+
 [dependencies]
+http = { version = "1.1", optional = true }
+sqlx = { version = "0.9.0", default-features = false, features = ["mysql", "runtime-tokio"], optional = true }
+tower-layer = { version = "0.3", optional = true }
+tower-service = { version = "0.3", optional = true }
 
 [dev-dependencies]
+sqlx = { version = "0.9.0", default-features = false, features = ["mysql", "runtime-tokio", "tls-native-tls"] }
+tokio = { version = "1.41", features = ["macros", "rt", "rt-multi-thread"] }
+tower = { version = "0.5", features = ["util"] }
 proptest = { version = "1.5", default-features = false, features = ["std"] }
+
+[package.metadata.docs.rs]
+all-features = true
