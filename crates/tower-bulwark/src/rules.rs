@@ -2,6 +2,7 @@ use std::net::IpAddr;
 use std::time::Duration;
 
 use http::{HeaderMap, Method, StatusCode, Uri};
+use tower_cross_origin::CrossOriginProtection;
 
 /// What a [`Rule`] sees of a request.
 #[derive(Debug, Clone, Copy)]
@@ -55,43 +56,32 @@ where
 
 // ── Same origin ─────────────────────────────────────────────────────────────
 
-/// Refuses cross-site writes. Browsers send `Origin` on every POST, PUT, PATCH and
-/// DELETE; it must name this host. With no `Origin` the request is allowed only when
-/// `Sec-Fetch-Site` is absent (a non-browser client, which cannot carry a victim's
-/// cookies) or says same-origin.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct SameOriginWrites;
+/// Refuses cross-origin writes, with the rules of [`tower_cross_origin`] (the same as Go's
+/// `CrossOriginProtection`): `Sec-Fetch-Site` first, then `Origin` against `Host`; requests
+/// with neither come from non-browser clients and pass.
+#[derive(Debug, Clone, Default)]
+pub struct SameOriginWrites {
+    policy: CrossOriginProtection,
+}
+
+impl SameOriginWrites {
+    /// Use a configured policy (trusted origins, bypassed paths).
+    pub fn new(policy: CrossOriginProtection) -> Self {
+        SameOriginWrites { policy }
+    }
+}
 
 impl Rule for SameOriginWrites {
     fn check(&self, req: &RequestView<'_>) -> Result<(), Rejection> {
-        if matches!(*req.method, Method::GET | Method::HEAD | Method::OPTIONS) {
-            return Ok(());
-        }
         let host = req
             .headers
             .get(http::header::HOST)
             .and_then(|h| h.to_str().ok())
             .or_else(|| req.uri.authority().map(http::uri::Authority::as_str));
-        let ok = match req.headers.get(http::header::ORIGIN).map(|o| o.to_str()) {
-            Some(Ok(origin)) => origin_host(origin).zip(host).is_some_and(|(o, h)| o.eq_ignore_ascii_case(h)),
-            Some(Err(_)) => false,
-            None => matches!(
-                req.headers.get("sec-fetch-site").and_then(|v| v.to_str().ok()),
-                None | Some("same-origin" | "none")
-            ),
-        };
-        if ok {
-            Ok(())
-        } else {
-            Err(Rejection::new(StatusCode::FORBIDDEN, "Cross-site requests are not allowed."))
-        }
+        self.policy
+            .check_parts(req.method, req.uri.path(), req.headers, host)
+            .map_err(|_| Rejection::new(StatusCode::FORBIDDEN, "Cross-site requests are not allowed."))
     }
-}
-
-fn origin_host(origin: &str) -> Option<&str> {
-    let rest = origin.strip_prefix("https://").or_else(|| origin.strip_prefix("http://"))?;
-    let host = rest.split('/').next()?;
-    (!host.is_empty()).then_some(host)
 }
 
 // ── Rate limit ──────────────────────────────────────────────────────────────

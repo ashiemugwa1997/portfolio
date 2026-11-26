@@ -35,6 +35,8 @@ use std::time::Duration;
 use http::{HeaderName, HeaderValue};
 use tower_layer::Layer;
 
+pub use tower_cross_origin::CrossOriginProtection;
+
 pub use headers::HeaderPolicy;
 pub use ip::{ClientIp, ClientIpResolver};
 pub use rules::{Rejection, RequestView, Rule, SameOriginWrites};
@@ -66,7 +68,7 @@ impl Bulwark {
         BulwarkBuilder {
             headers: HeaderPolicy::strict(STRICT_CSP),
             resolver: ClientIpResolver::default(),
-            same_origin: true,
+            same_origin: Some(CrossOriginProtection::new()),
             rules: Vec::new(),
         }
     }
@@ -92,7 +94,7 @@ impl<S> Layer<S> for Bulwark {
 pub struct BulwarkBuilder {
     headers: HeaderPolicy,
     resolver: ClientIpResolver,
-    same_origin: bool,
+    same_origin: Option<CrossOriginProtection>,
     rules: Vec<Box<dyn Rule>>,
 }
 
@@ -139,7 +141,21 @@ impl BulwarkBuilder {
     /// Turn the same-origin check on writes on or off (on by default).
     #[must_use]
     pub fn same_origin_writes(mut self, on: bool) -> Self {
-        self.same_origin = on;
+        self.same_origin = on.then(|| self.same_origin.take().unwrap_or_default());
+        self
+    }
+
+    /// Also accept writes from `origin` (`scheme://host[:port]`).
+    #[must_use]
+    pub fn trust_origin(mut self, origin: &str) -> Self {
+        self.same_origin = Some(self.same_origin.take().unwrap_or_default().trust_origin(origin));
+        self
+    }
+
+    /// Replace the cross-origin policy (trusted origins, bypassed paths such as webhooks).
+    #[must_use]
+    pub fn cross_origin(mut self, policy: CrossOriginProtection) -> Self {
+        self.same_origin = Some(policy);
         self
     }
 
@@ -160,8 +176,8 @@ impl BulwarkBuilder {
     /// Finish.
     pub fn build(self) -> Bulwark {
         let mut rules: Vec<Box<dyn Rule>> = Vec::with_capacity(self.rules.len() + 1);
-        if self.same_origin {
-            rules.push(Box::new(SameOriginWrites));
+        if let Some(policy) = self.same_origin {
+            rules.push(Box::new(SameOriginWrites::new(policy)));
         }
         rules.extend(self.rules);
         Bulwark { shared: Arc::new(Shared { headers: self.headers, resolver: self.resolver, rules }) }

@@ -1,0 +1,27 @@
+[package]
+name = "tower-cross-origin"
+version = "0.1.0"
+description = "CSRF protection without tokens or sessions: refuses cross-origin writes using Sec-Fetch-Site and Origin, like Go's net/http CrossOriginProtection. Tower layer included."
+readme = "README.md"
+keywords = ["csrf", "tower", "axum", "security", "origin"]
+categories = ["web-programming::http-server", "network-programming"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[features]
+default = ["tower"]
+tower = ["dep:tower-layer", "dep:tower-service", "dep:pin-project-lite"]
+
+[dependencies]
+http = "1.1"
+pin-project-lite = { version = "0.2", optional = true }
+tower-layer = { version = "0.3", optional = true }
+tower-service = { version = "0.3", optional = true }
+
+[dev-dependencies]
+proptest = { version = "1.5", default-features = false, features = ["std"] }
+tokio = { version = "1.41", features = ["macros", "rt"] }
+tower = { version = "0.5", features = ["util"] }

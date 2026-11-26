@@ -49,6 +49,8 @@ async fn cross_site_post_is_refused() {
     let layer = Bulwark::default();
     let cases = [
         (Some("https://site.test"), None, StatusCode::OK),
+        (Some("https://evil.test"), Some("same-origin"), StatusCode::OK), // Sec-Fetch-Site wins
+        (Some("https://site.test"), Some("same-site"), StatusCode::FORBIDDEN), // sibling subdomain
         (Some("https://evil.test"), None, StatusCode::FORBIDDEN),
         (Some("https://site.test.evil.test"), None, StatusCode::FORBIDDEN),
         (Some("null"), None, StatusCode::FORBIDDEN),

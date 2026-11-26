@@ -28,14 +28,16 @@ proptest! {
         }
         let uri: Uri = "/x".parse().unwrap();
         let view = RequestView { method: &Method::POST, uri: &uri, headers: &headers, client_ip: None };
-        let allowed = SameOriginWrites.check(&view).is_ok();
+        let allowed = SameOriginWrites::default().check(&view).is_ok();
 
         let sent_origin = headers.get("origin").and_then(|v| v.to_str().ok());
-        let expected = match sent_origin {
-            Some(o) => o.strip_prefix("https://").or_else(|| o.strip_prefix("http://"))
-                .map(|rest| rest.split('/').next().unwrap_or(""))
-                .is_some_and(|h| !h.is_empty() && h.eq_ignore_ascii_case(&host)),
-            None => matches!(fetch_site.as_deref(), None | Some("same-origin" | "none")),
+        let same_host = sent_origin
+            .and_then(|o| o.strip_prefix("https://").or_else(|| o.strip_prefix("http://")))
+            .is_some_and(|h| !h.is_empty() && !h.contains('/') && h.eq_ignore_ascii_case(&host));
+        let expected = match fetch_site.as_deref() {
+            Some("same-origin" | "none") => true,
+            Some(_) => false,
+            None => sent_origin.is_none() || same_host,
         };
         prop_assert_eq!(allowed, expected);
     }

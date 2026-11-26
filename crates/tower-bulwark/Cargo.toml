@@ -1,6 +1,6 @@
 [package]
 name = "tower-bulwark"
-version = "0.1.0"
+version = "0.2.0"
 description = "Tower layer for safer web services: strict security headers, same-origin writes (CSRF), trusted-proxy client IP, per-IP rate limiting and pluggable request rules."
 readme = "README.md"
 keywords = ["tower", "security", "csrf", "headers", "axum"]
@@ -20,7 +20,8 @@ http = "1.1"
 pin-project-lite = "0.2"
 tower-layer = "0.3"
 tower-service = "0.3"
-windowgate = { path = "../windowgate", version = "0.1", optional = true }
+tower-cross-origin = { path = "../tower-cross-origin", version = "0.1", default-features = false }
+windowgate = { path = "../windowgate", version = "0.2", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.41", features = ["macros", "rt"] }
