@@ -1,13 +1,16 @@
 # Ashley Mugwambi: portfolio
 
-My portfolio site. The front end is React; everything behind it is Rust, split into four small crates that are useful on their own and published separately.
+My portfolio site. The front end is React; everything behind it is Rust, split into small crates that are useful on their own and published on crates.io.
 
 | Path | What |
 |---|---|
-| [`crates/fuzzrank`](crates/fuzzrank) | Fuzzy search: every word must match, word starts and runs rank higher, Unicode-safe, no dependencies. Character-fingerprint quick reject and heap top-k. |
-| [`crates/windowgate`](crates/windowgate) | Sliding-window rate limiter per key with bounded memory, so floods from rotating addresses cannot exhaust it. |
-| [`crates/tower-bulwark`](crates/tower-bulwark) | Tower/axum layer: strict security headers, same-origin writes (CSRF), trusted-proxy client IP, rate limiting, pluggable rules. |
-| [`crates/contact-guard`](crates/contact-guard) | Contact-form validation, honeypot, and email composition that cannot be header-injected. |
+| [`crates/fuzzrank`](crates/fuzzrank) | Fuzzy search: every word must match, highlight positions, `fuzzy-matcher`-compatible API. 14× faster than fuzzy-matcher and 1.6× faster than nucleo on 16k real paths. No dependencies. |
+| [`crates/windowgate`](crates/windowgate) | Sliding-window rate limiter with bounded memory; optional MySQL backend shared across servers and a tower layer. |
+| [`crates/tower-cross-origin`](crates/tower-cross-origin) | CSRF protection without tokens: Sec-Fetch-Site and Origin rules (as in Go's `CrossOriginProtection`), tower layer. |
+| [`crates/tower-bulwark`](crates/tower-bulwark) | Tower/axum layer: strict security headers, CSRF, trusted-proxy client IP, rate limiting, pluggable rules. |
+| [`crates/contact-guard`](crates/contact-guard) | Contact-form validation, honeypot, email composition that cannot be header-injected; optional `lettre` output. |
+| [`npm/fuzzrank-wasm`](npm/fuzzrank-wasm) | fuzzrank for JavaScript: 47 KB of WebAssembly with types and a `highlight()` helper. |
+| `benches/fuzzrank-bench` | fuzzrank against fuzzy-matcher and nucleo-matcher on real file paths. |
 | `engine/` | fuzzrank compiled to WebAssembly for the Ctrl+K search (38 KB, no wasm-bindgen). |
 | `server/` | The web server (axum + sqlx): profile from MySQL, contact form, the built site served from memory. |
 | `web/` | React + TypeScript (Vite). |

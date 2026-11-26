@@ -1,0 +1,102 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --workspace
+      - name: Crates with every feature
+        run: cargo test -p windowgate -p contact-guard -p tower-cross-origin -p tower-bulwark -p fuzzrank --all-features
+
+  mysql:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: portfolio
+        ports: ["3306:3306"]
+        options: --health-cmd="mysqladmin ping -h 127.0.0.1" --health-interval=5s --health-retries=20
+    env:
+      TEST_MYSQL_URL: mysql://root@127.0.0.1:3306
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Server against MySQL
+        run: cargo test -p portfolio-server
+      - name: windowgate MySQL backend
+        run: TEST_MYSQL_URL=mysql://root@127.0.0.1:3306/portfolio cargo test -p windowgate --all-features
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.75
+      # the workspace lockfile is newer than cargo 1.75 reads: check the dependency-free crates on their own
+      - name: Dependency-free crates build and pass on the minimum supported Rust
+        run: |
+          python3 - <<'EOF'
+          import pathlib, re, shutil
+          out = pathlib.Path("/tmp/msrv")
+          for c in ("fuzzrank", "windowgate", "contact-guard"):
+              shutil.copytree(f"crates/{c}", out / "crates" / c, ignore=shutil.ignore_patterns("tests"))
+              keep, skip = [], False
+              for line in open(f"crates/{c}/Cargo.toml"):
+                  if line.startswith("["):
+                      skip = line.strip() == "[dev-dependencies]"
+                  if not skip:
+                      keep.append(line)
+              (out / "crates" / c / "Cargo.toml").write_text("".join(keep))
+          root = open("Cargo.toml").read()
+          root = re.sub(r"members = \[[^\]]*\]", 'members = ["crates/fuzzrank", "crates/windowgate", "crates/contact-guard"]', root)
+          (out / "Cargo.toml").write_text(root)
+          EOF
+          cd /tmp/msrv && cargo test --lib -p fuzzrank -p windowgate -p contact-guard
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Site
+        working-directory: web
+        run: npm ci && npm test && npm run build
+      - name: fuzzrank-wasm
+        working-directory: npm/fuzzrank-wasm
+        run: npm test
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: npm audit
+        working-directory: web
+        run: npm audit --omit=dev
