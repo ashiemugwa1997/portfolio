@@ -4,6 +4,7 @@ members = [
     "crates/fuzzrank",
     "crates/windowgate",
     "crates/tower-bulwark",
+    "crates/contact-guard",
     "engine",
 ]
 

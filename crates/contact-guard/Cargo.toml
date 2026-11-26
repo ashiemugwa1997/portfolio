@@ -1,0 +1,21 @@
+[package]
+name = "contact-guard"
+version = "0.1.0"
+description = "Validation, honeypot and header-injection-safe email composition for website contact forms."
+readme = "README.md"
+keywords = ["contact-form", "validation", "email", "honeypot", "security"]
+categories = ["web-programming", "email", "parser-implementations"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[features]
+serde = ["dep:serde"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"
