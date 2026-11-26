@@ -1,0 +1,4 @@
+[advisories]
+# libsqlite3-sys: listed in Cargo.lock through sqlx's optional SQLite driver, which this workspace
+# never enables; it is not compiled (`cargo tree -i libsqlite3-sys` is empty). Re-check when sqlx updates.
+ignore = ["RUSTSEC-2026-0459"]
