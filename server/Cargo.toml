@@ -18,7 +18,7 @@ native-tls = ["lettre/tokio1-native-tls"]
 rustls = ["lettre/tokio1-rustls-tls"]
 
 [dependencies]
-contact-guard = { path = "../crates/contact-guard", features = ["serde"] }
+contact-guard = { path = "../crates/contact-guard", features = ["serde", "lettre"] }
 tower-bulwark = { path = "../crates/tower-bulwark" }
 windowgate = { path = "../crates/windowgate" }
 

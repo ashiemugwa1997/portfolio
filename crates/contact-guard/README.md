@@ -34,6 +34,8 @@ match form.check(Submission::new("Rudo", "rudo@example.com", "Hello!")) {
 - Body lines starting with `.` are dot-stuffed, so a lone `.` cannot end SMTP `DATA` early.
 - Reply-To is the visitor; From is always your own address, so SPF/DMARC stay happy.
 
+With the `lettre` feature, `msg.to_lettre(from, to, "Contact form message from")` gives you a ready-to-send `lettre::Message`.
+
 With the `serde` feature, `Submission` deserializes from JSON, rejects unknown fields and accepts the honeypot as `website`.
 
 ## Licence

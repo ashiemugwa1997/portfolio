@@ -97,6 +97,56 @@ fn base64(input: &[u8]) -> String {
     out
 }
 
+// ── lettre ──────────────────────────────────────────────────────────────────
+
+#[cfg(feature = "lettre")]
+impl Message {
+    /// A ready-to-send [`lettre::Message`]: from and to are your own mailboxes, reply-to is
+    /// the visitor, the subject is `subject_prefix` and their name on one line.
+    pub fn to_lettre(
+        &self,
+        from: lettre::message::Mailbox,
+        to: lettre::message::Mailbox,
+        subject_prefix: &str,
+    ) -> Result<lettre::Message, ToLettreError> {
+        let address = self.email().parse().map_err(ToLettreError::Address)?;
+        let reply_to = lettre::message::Mailbox::new(Some(header_safe(self.name()).into_owned()), address);
+        lettre::Message::builder()
+            .from(from)
+            .to(to)
+            .reply_to(reply_to)
+            .subject(format!("{} {}", header_safe(subject_prefix), header_safe(self.name())))
+            .header(lettre::message::header::ContentType::TEXT_PLAIN)
+            .body(format!("{} <{}> wrote:
+
+{}", header_safe(self.name()), self.email(), self.body()))
+            .map_err(ToLettreError::Build)
+    }
+}
+
+/// Why [`Message::to_lettre`] could not build the email.
+#[cfg(feature = "lettre")]
+#[derive(Debug)]
+pub enum ToLettreError {
+    /// The visitor's address was refused by lettre's stricter parser.
+    Address(lettre::address::AddressError),
+    /// lettre could not build the message.
+    Build(lettre::error::Error),
+}
+
+#[cfg(feature = "lettre")]
+impl std::fmt::Display for ToLettreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ToLettreError::Address(e) => write!(f, "reply-to address: {e}"),
+            ToLettreError::Build(e) => write!(f, "email: {e}"),
+        }
+    }
+}
+
+#[cfg(feature = "lettre")]
+impl std::error::Error for ToLettreError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,6 +195,17 @@ mod tests {
         assert_eq!(base64(b"fo"), "Zm8=");
         assert_eq!(base64(b"foo"), "Zm9v");
         assert_eq!(base64("Zoë".as_bytes()), "Wm/Dqw==");
+    }
+
+    #[cfg(feature = "lettre")]
+    #[test]
+    fn builds_a_lettre_message() {
+        let Verdict::Accept(m) = Form::contact().check(Submission::new("Zoë", "zoe@example.com", "Hello")) else { panic!() };
+        let email = m.to_lettre("Site <me@example.com>".parse().unwrap(), "me@example.com".parse().unwrap(), "Portfolio message from").unwrap();
+        let raw = String::from_utf8(email.formatted()).unwrap();
+        assert!(raw.contains("Reply-To: =?utf-8?b?") || raw.contains("Reply-To: \"Zo"), "{raw}");
+        assert!(raw.contains("zoe@example.com"));
+        assert!(raw.contains("Hello"));
     }
 
     #[test]

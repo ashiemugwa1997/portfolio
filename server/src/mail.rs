@@ -4,8 +4,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use contact_guard::{header_safe, Message};
-use lettre::message::{header::ContentType, Mailbox};
+use contact_guard::Message;
+use lettre::message::Mailbox;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::transport::smtp::client::{Tls, TlsParameters};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
@@ -62,15 +62,7 @@ fn ipv4_first(addrs: impl IntoIterator<Item = SocketAddr>) -> Vec<IpAddr> {
 impl Mailer for Smtp {
     fn send<'a>(&'a self, m: &'a Message) -> MailFuture<'a> {
         Box::pin(async move {
-            let reply_to: Mailbox = m.email().parse().map_err(|e: lettre::address::AddressError| e.to_string())?;
-            let email = lettre::Message::builder()
-                .from(self.from.clone())
-                .to(self.to.clone())
-                .reply_to(reply_to)
-                .subject(format!("Portfolio message from {}", header_safe(m.name())))
-                .header(ContentType::TEXT_PLAIN)
-                .body(format!("{} <{}> wrote:\n\n{}", header_safe(m.name()), m.email(), m.body()))
-                .map_err(|e| e.to_string())?;
+            let email = m.to_lettre(self.from.clone(), self.to.clone(), "Portfolio message from").map_err(|e| e.to_string())?;
 
             let addrs = tokio::net::lookup_host((self.host.as_str(), self.port)).await.map_err(|e| format!("{}: {e}", self.host))?;
             let mut last = format!("{}: no addresses", self.host);

@@ -26,6 +26,8 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 pub use email::{header_safe, PlainEmail};
+#[cfg(feature = "lettre")]
+pub use email::ToLettreError;
 pub use rules::{EmailShape, FieldRule, MaxChars, NoControl, Required};
 
 // ── Submission ──────────────────────────────────────────────────────────────
