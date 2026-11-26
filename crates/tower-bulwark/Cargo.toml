@@ -25,3 +25,4 @@ windowgate = { path = "../windowgate", version = "0.1", optional = true }
 [dev-dependencies]
 tokio = { version = "1.41", features = ["macros", "rt"] }
 tower = { version = "0.5", features = ["util"] }
+proptest = { version = "1.5", default-features = false, features = ["std"] }
