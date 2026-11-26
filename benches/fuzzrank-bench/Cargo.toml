@@ -1,0 +1,11 @@
+[package]
+name = "fuzzrank-bench"
+version = "0.0.0"
+description = "fuzzrank against fuzzy-matcher and nucleo-matcher on real file paths"
+publish = false
+edition.workspace = true
+
+[dependencies]
+fuzzrank = { path = "../../crates/fuzzrank" }
+fuzzy-matcher = "=0.3.7"
+nucleo-matcher = "=0.3.1"

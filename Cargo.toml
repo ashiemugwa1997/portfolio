@@ -5,8 +5,10 @@ members = [
     "crates/windowgate",
     "crates/tower-bulwark",
     "crates/contact-guard",
+    "crates/tower-cross-origin",
     "engine",
     "server",
+    "benches/fuzzrank-bench",
 ]
 
 [workspace.package]
