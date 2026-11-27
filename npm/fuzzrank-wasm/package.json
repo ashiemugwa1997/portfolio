@@ -15,7 +15,7 @@
   "author": "Ashley Mugwambi",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/ashiemugwa1997/portfolio.git", "directory": "npm/fuzzrank-wasm" },
-  "homepage": "https://crates.io/crates/fuzzrank",
+  "homepage": "https://samugwambi.site",
   "engines": { "node": ">=18" },
   "scripts": { "test": "node --test test.mjs" }
 }

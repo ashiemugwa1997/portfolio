@@ -17,6 +17,7 @@ rust-version = "1.75"
 license = "MIT OR Apache-2.0"
 authors = ["Ashley Mugwambi"]
 repository = "https://github.com/ashiemugwa1997/portfolio"
+homepage = "https://samugwambi.site"
 
 # engine.wasm is downloaded by every visitor: keep it small
 [profile.release]
