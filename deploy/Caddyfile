@@ -1,6 +1,10 @@
 # Caddy: automatic HTTPS (Let's Encrypt), HTTP -> HTTPS, HTTP/2 and HTTP/3.
-# Replace the domain, then: sudo cp Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
-portfolio.example.com {
+# sudo cp Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+www.samugwambi.site {
+	redir https://samugwambi.site{uri} permanent
+}
+
+samugwambi.site {
 	encode zstd gzip
 
 	# the server does the rest of the headers; HSTS is sent by it when HTTPS=1

@@ -3,5 +3,6 @@ web/dist/
 web/public/engine.wasm
 target/
 server/.env
+server/.env.*
 server/data/
 *.exe

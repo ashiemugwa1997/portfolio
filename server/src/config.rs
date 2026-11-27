@@ -21,6 +21,7 @@ pub struct Config {
     smtp_host: String,
     smtp_port: u16,
     mail_to: Option<String>,
+    mail_from: Option<String>,
 }
 
 pub struct SmtpSettings {
@@ -29,6 +30,8 @@ pub struct SmtpSettings {
     pub user: String,
     pub pass: String,
     pub to: String,
+    /// the sender address; iCloud signs in with the Apple ID but can send from a custom domain
+    pub from: String,
 }
 
 impl Config {
@@ -52,6 +55,7 @@ impl Config {
             smtp_host: var("SMTP_HOST").unwrap_or_else(|| "smtp.gmail.com".into()),
             smtp_port: var("SMTP_PORT").and_then(|v| v.parse().ok()).unwrap_or(587),
             mail_to: var("MAIL_TO"),
+            mail_from: var("MAIL_FROM"),
         }
     }
 
@@ -62,6 +66,7 @@ impl Config {
             host: self.smtp_host.clone(),
             port: self.smtp_port,
             to: self.mail_to.clone().unwrap_or_else(|| user.clone()),
+            from: self.mail_from.clone().unwrap_or_else(|| user.clone()),
             user,
             pass,
         })
@@ -126,7 +131,34 @@ pub async fn import_old_messages<S: Store>(store: &S, path: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::secret;
+    use super::{secret, Config};
+
+    fn with_mail(from: Option<&str>) -> Config {
+        Config {
+            addr: String::new(),
+            static_dir: ".".into(),
+            dsn: None,
+            admin_dsn: None,
+            trust_proxy: false,
+            https: false,
+            max_connections: 1,
+            rate_limit: 1,
+            ip_salt: None,
+            smtp_user: Some("me@icloud.com".into()),
+            smtp_pass: Some("x".into()),
+            smtp_host: "smtp.mail.me.com".into(),
+            smtp_port: 587,
+            mail_to: None,
+            mail_from: from.map(Into::into),
+        }
+    }
+
+    #[test]
+    fn mail_can_come_from_another_address_than_the_login() {
+        let s = with_mail(Some("hello@samugwambi.site")).smtp().unwrap();
+        assert_eq!((s.user.as_str(), s.from.as_str(), s.to.as_str()), ("me@icloud.com", "hello@samugwambi.site", "me@icloud.com"));
+        assert_eq!(with_mail(None).smtp().unwrap().from, "me@icloud.com", "the login by default");
+    }
 
     #[test]
     fn secrets_can_come_from_files() {

@@ -2,6 +2,20 @@
 
 The server is built to sit behind a TLS-terminating proxy on a Linux box. Everything here is in `deploy/`.
 
+## 0. Domain and server
+
+The domain is `samugwambi.site` (Cloudflare Registrar). In the Cloudflare dashboard → DNS:
+
+| Type | Name | Content | Proxy |
+|---|---|---|---|
+| A | `@` | the server's IPv4 address | DNS only (grey cloud) |
+| AAAA | `@` | the server's IPv6 address, if it has one | DNS only |
+| CNAME | `www` | `samugwambi.site` | DNS only |
+
+Keep the cloud grey so Caddy can get its own certificate; it can be turned orange later (then SSL/TLS mode **Full (strict)**). Leave iCloud's MX, TXT and CNAME mail records as they are.
+
+A small server is enough (Hetzner CX22 or Oracle Cloud Always Free, Ubuntu 24.04): install MySQL 8 and Caddy, run `server/scripts/setup-mysql.sh`, copy the release binary, `server/content` and `web/dist` to `/opt/portfolio`, then follow the steps below. `deploy/provision.sh` does all of this on a fresh server in one run.
+
 ## 1. HTTPS
 
 Pick one:
@@ -21,13 +35,28 @@ After an upgrade, run `portfolio migrate` (admin account): it adds missing table
 
 ## 3. Email account and secrets
 
-Use a **separate Gmail account just for the site** rather than your own:
+### iCloud+ with samugwambi.site (optional)
 
-1. Create a new Google account (e.g. `yourname.portfolio@gmail.com`) and turn on 2-Step Verification.
-2. Security → App passwords → create one called "Portfolio".
-3. Set `SMTP_USER` to that account and `MAIL_TO` to your real address.
+1. iPhone: Settings → your name → iCloud → Custom Email Domain → add `samugwambi.site` (bought through Cloudflare). Choose to add the records automatically with Cloudflare, or add the MX, SPF (TXT) and DKIM (CNAME) records it lists in the Cloudflare dashboard yourself.
+2. Create the address the site sends from, e.g. `hello@samugwambi.site`.
+3. account.apple.com → Sign-In and Security → App-Specific Passwords → create one called "Portfolio".
+4. Settings:
 
-If the server is ever breached, the attacker gets a mailbox that only sends you notifications, not your own inbox.
+   ```
+   SMTP_HOST=smtp.mail.me.com
+   SMTP_PORT=587
+   SMTP_USER=<your Apple ID email>
+   MAIL_FROM=hello@samugwambi.site
+   MAIL_TO=<where you want messages>
+   ```
+
+   and the app-specific password as the `smtp_pass` credential (below), never in `.env`.
+
+iCloud signs in with the Apple ID; `MAIL_FROM` is the custom-domain address the message comes from. If the server is ever breached, revoke the app-specific password at account.apple.com: the Apple ID itself is not exposed.
+
+### Gmail (what the live site uses)
+
+Use a separate Gmail account just for the site: turn on 2-Step Verification, create an App password called "Portfolio", set `SMTP_USER` to that account and `MAIL_TO` to your real address. `SMTP_HOST` defaults to Gmail.
 
 Any setting can come from a file instead of the environment: `SMTP_PASS_FILE`, `MYSQL_DSN_FILE`, `IP_HASH_SALT_FILE` and so on. The systemd unit uses this with encrypted credentials, so the app password is never in `.env` or the process environment.
 
@@ -46,7 +75,7 @@ Contact-form limits are counted in MySQL (3 an hour per sender, 50 a day for the
 ## Checklist
 
 - [ ] Domain points at the server; Caddy or nginx installed with the config from `deploy/`
-- [ ] `server/.env` (mode 600) with `MYSQL_DSN`, `IP_HASH_SALT`, `SMTP_USER`, `MAIL_TO`; app password as an encrypted credential
+- [ ] `server/.env` (mode 600) with `MYSQL_DSN`, `IP_HASH_SALT`, `SMTP_HOST`, `SMTP_USER`, `MAIL_FROM`, `MAIL_TO`; app-specific password as an encrypted credential
 - [ ] `portfolio seed` once, `portfolio migrate` after each upgrade
 - [ ] `HTTPS=1`, `TRUST_PROXY=1`, `ADDR=127.0.0.1:8080`
 - [ ] Firewall: only 80 and 443 open; MySQL not reachable from outside

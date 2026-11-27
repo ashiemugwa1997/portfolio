@@ -79,7 +79,7 @@ async fn serve(cfg: Config) -> Result<(), String> {
     config::import_old_messages(store.as_ref(), "data/messages.jsonl").await;
 
     let notifier = if let Some(s) = cfg.smtp() {
-        let mailer: Arc<dyn Mailer> = Arc::new(Smtp::new(&s.host, s.port, &s.user, &s.pass, &s.to)?);
+        let mailer: Arc<dyn Mailer> = Arc::new(Smtp::new(&s.host, s.port, &s.user, &s.pass, &s.from, &s.to)?);
         tracing::info!("email on: messages are also emailed");
         Notifier::new(Some(mailer))
     } else {

@@ -19,7 +19,7 @@ pub trait Mailer: Send + Sync + 'static {
 
 // ── SMTP ────────────────────────────────────────────────────────────────────
 
-/// Sends through an SMTP relay with STARTTLS (Gmail with an app password by default).
+/// Sends through an SMTP relay with STARTTLS (Gmail or iCloud with an app password).
 ///
 /// Addresses are resolved per send and tried IPv4 first: on networks where IPv6 is listed
 /// but not routed, a client that takes the first answer waits out its whole timeout.
@@ -34,9 +34,9 @@ pub struct Smtp {
 }
 
 impl Smtp {
-    pub fn new(host: &str, port: u16, user: &str, pass: &str, to: &str) -> Result<Self, String> {
+    pub fn new(host: &str, port: u16, user: &str, pass: &str, from: &str, to: &str) -> Result<Self, String> {
         let tls = TlsParameters::new(host.to_owned()).map_err(|e| e.to_string())?;
-        let from = format!("Portfolio <{user}>").parse::<Mailbox>().map_err(|e| e.to_string())?;
+        let from = format!("Portfolio <{from}>").parse::<Mailbox>().map_err(|e| e.to_string())?;
         let to = to.parse::<Mailbox>().map_err(|e| e.to_string())?;
         Ok(Smtp { host: host.to_owned(), port, creds: Credentials::new(user.to_owned(), pass.to_owned()), tls, from, to })
     }
