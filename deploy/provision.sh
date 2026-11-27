@@ -79,9 +79,10 @@ if [ -d /tmp/dist ]; then rm -rf "$APP/web/dist" && mv /tmp/dist "$APP/web/dist"
 
 echo "== database"
 if ! grep -q '^MYSQL_DSN=' "$APP/server/.env" 2>/dev/null; then
-  # root signs in over the local socket (auth_socket), not over TCP
-  printf '#!/bin/sh\nexec mysql --protocol=socket "$@"\n' > /usr/local/sbin/mysql-socket && chmod 700 /usr/local/sbin/mysql-socket
-  (cd "$APP/server" && MYSQL=/usr/local/sbin/mysql-socket scripts/setup-mysql.sh -u root)
+  # root signs in over the local socket (auth_socket): "-h localhost" means the socket to the client;
+  # the app itself connects over TCP to 127.0.0.1
+  (cd "$APP/server" && PORTFOLIO_DB_HOST=localhost scripts/setup-mysql.sh -u root)
+  sed -i 's#@localhost:3306/#@127.0.0.1:3306/#' "$APP/server/.env"
 fi
 chown portfolio:portfolio "$APP/server/.env" && chmod 600 "$APP/server/.env"
 (cd "$APP/server" && sudo -u portfolio "$APP/portfolio" migrate)
