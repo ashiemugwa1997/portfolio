@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# One-time setup of a fresh Ubuntu 24.04 server for the portfolio, run as root.
+# One-time setup of a fresh Ubuntu 24.04 / 26.04 server for the portfolio, run as root.
 # Safe to run again: every step checks before it changes anything.
-#   scp -r web/dist root@HOST:/tmp/dist && ssh root@HOST 'bash -s' < deploy/provision.sh
+#   scp -P 2222 -r web/dist root@HOST:/tmp/dist && ssh -p 2222 root@HOST 'bash -s' < deploy/provision.sh
+# The server must already listen on 2222 as well as 22 (Hetzner cloud config, sshd_config.d/05-ports.conf).
 # Secrets are not handled here: the SMTP app password goes in afterwards with
 #   systemd-creds encrypt --name=smtp_pass - /etc/credstore.encrypted/smtp_pass
 set -euo pipefail
@@ -11,6 +12,13 @@ REPO=${REPO:-https://github.com/ashiemugwa1997/portfolio.git}
 SRC=/opt/src/portfolio
 APP=/opt/portfolio
 export DEBIAN_FRONTEND=noninteractive
+
+echo "== swap (a 1 GB server needs it to build)"
+if ! swapon --show | grep -q /swapfile; then
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+sysctl -q vm.swappiness=10 && echo 'vm.swappiness=10' > /etc/sysctl.d/90-swap.conf
 
 echo "== packages"
 apt-get update -q
@@ -29,6 +37,7 @@ sshd -t && systemctl reload ssh
 
 echo "== firewall: ssh, http, https"
 ufw allow OpenSSH >/dev/null
+ufw allow 2222/tcp >/dev/null   # SSH for networks that block 22
 ufw allow 80/tcp >/dev/null
 ufw allow 443 >/dev/null
 ufw --force enable >/dev/null
@@ -39,6 +48,14 @@ cat > /etc/mysql/mysql.conf.d/zz-portfolio.cnf <<'EOF'
 bind-address = 127.0.0.1
 mysqlx = OFF
 require_secure_transport = ON
+# sized for a 1 GB server: one small site
+performance_schema = OFF
+innodb_buffer_pool_size = 64M
+innodb_log_buffer_size = 8M
+key_buffer_size = 8M
+tmp_table_size = 16M
+max_heap_table_size = 16M
+max_connections = 40
 EOF
 systemctl restart mysql
 
