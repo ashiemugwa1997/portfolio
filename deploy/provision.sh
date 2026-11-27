@@ -32,8 +32,35 @@ cat > /etc/ssh/sshd_config.d/10-portfolio.conf <<'EOF'
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin prohibit-password
+MaxAuthTries 3
+X11Forwarding no
+AllowTcpForwarding no
+AllowAgentForwarding no
 EOF
 sshd -t && systemctl reload ssh
+
+echo "== fail2ban: both SSH ports, longer bans for repeat offenders"
+cat > /etc/fail2ban/jail.d/portfolio.conf <<'EOF'
+[sshd]
+enabled = true
+port = 22,2222
+maxretry = 4
+findtime = 10m
+bantime = 1h
+bantime.increment = true
+bantime.maxtime = 1w
+
+[recidive]
+enabled = true
+banaction = nftables[type=allports]
+EOF
+systemctl restart fail2ban
+
+echo "== updates reboot at 02:00 UTC when needed"
+cat > /etc/apt/apt.conf.d/52portfolio-reboot <<'EOF'
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+EOF
 
 echo "== firewall: ssh, http, https"
 ufw allow OpenSSH >/dev/null
@@ -86,6 +113,19 @@ if ! grep -q '^MYSQL_DSN=' "$APP/server/.env" 2>/dev/null; then
 fi
 chown portfolio:portfolio "$APP/server/.env" && chmod 600 "$APP/server/.env"
 (cd "$APP/server" && sudo -u portfolio "$APP/portfolio" migrate)
+
+echo "== nightly database backup, kept 14 days"
+install -d -m 700 /var/backups/portfolio
+cat > /usr/local/sbin/portfolio-backup <<'EOF'
+#!/bin/sh
+set -eu
+f=/var/backups/portfolio/portfolio-$(date +%F).sql.gz
+mysqldump --single-transaction --routines --no-tablespaces portfolio | gzip -9 > "$f.tmp" && mv "$f.tmp" "$f"
+chmod 600 "$f"
+find /var/backups/portfolio -name 'portfolio-*.sql.gz' -mtime +14 -delete
+EOF
+chmod 700 /usr/local/sbin/portfolio-backup
+echo '17 3 * * * root /usr/local/sbin/portfolio-backup' > /etc/cron.d/portfolio-backup
 
 echo "== service and HTTPS"
 install -m 644 "$SRC/deploy/portfolio.service" /etc/systemd/system/portfolio.service
