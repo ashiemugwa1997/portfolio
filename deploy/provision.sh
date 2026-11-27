@@ -134,4 +134,11 @@ sed "s/samugwambi.site/$DOMAIN/g" "$SRC/deploy/Caddyfile" > /etc/caddy/Caddyfile
 systemctl daemon-reload
 systemctl reload caddy || systemctl restart caddy
 
+if [ "${CLOUDFLARE_ONLY:-1}" = 1 ]; then
+  echo "== web ports to Cloudflare only (refreshed weekly)"
+  install -m 700 "$SRC/deploy/ufw-cloudflare.sh" /usr/local/sbin/ufw-cloudflare
+  /usr/local/sbin/ufw-cloudflare
+  echo '41 4 * * 1 root /usr/local/sbin/ufw-cloudflare >/dev/null' > /etc/cron.d/ufw-cloudflare
+fi
+
 echo "Done. Next: SMTP_USER / MAIL_TO in $APP/server/.env, the smtp_pass credential, 'portfolio seed' once, then systemctl enable --now portfolio"
